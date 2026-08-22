@@ -1,0 +1,63 @@
+[project]
+name = "synapse"
+authors = [
+    { name = "Dxbitz", email = "info@dxbitz.com"}
+]
+description = "A permission-aware MCP server for Frappe and ERPNext"
+requires-python = ">=3.10"
+readme = "README.md"
+dynamic = ["version"]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Frappe",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+# No dependencies on purpose. The MCP server is vendored in synapse/mcp_core —
+# see that package's docstring. `bench install-app synapse` is the whole
+# installation, and `bench update` stays safe on any bench carrying this app.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/erpuae/synapse"
+Repository = "https://github.com/erpuae/synapse"
+Issues = "https://github.com/erpuae/synapse/issues"
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.bench.frappe-dependencies]
+frappe = ">=15.0.0"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "UP", "B", "RUF"]
+ignore = [
+    "B017",
+    "B018",
+    "B023",
+    "B904",
+    "E101",
+    "E402",
+    "E501",
+    "E741",
+    "F401",
+    "F403",
+    "F405",
+    "F722",
+    "W191",
+]
+typing-modules = ["frappe.types.DF"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "tab"
+docstring-code-format = true
