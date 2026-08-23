@@ -218,6 +218,15 @@ class TestDenylistBuiltIns(unittest.TestCase):
 				with self.subTest(doctype=name, action=action), self.assertRaises(Denied):
 					check(p, action, name, ["Projects Manager"])
 
+	def test_control_plane_doctypes_are_blocked_outright(self):
+		# An agent must never edit the gate that governs it, even as System Manager.
+		p = denylist(denied={})
+		for name in ("MCP Settings", "mcp allowed doctype", "MCP Denied DocType",
+					 "MCP Role Permission", "MCP Access Log"):
+			for action in (READ, WRITE, DELETE):
+				with self.subTest(doctype=name, action=action), self.assertRaises(Denied):
+					check(p, action, name, ["Projects Manager"])
+
 	def test_schema_and_permission_doctypes_are_read_only(self):
 		p = denylist(denied={})
 		for name in ("DocType", "Custom Field", "Custom DocPerm", "Server Script", "Role", "User",

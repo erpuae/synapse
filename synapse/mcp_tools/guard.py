@@ -1,8 +1,9 @@
 # Copyright (c) 2026, Dxbitz and contributors
 """Read-only validation for SQL submitted through the MCP endpoint.
 
-Pure stdlib on purpose — no frappe import, no I/O, no side effects — so every
-rule can be unit tested without booting a site. See tests/test_mcp_guard.py.
+No frappe import, no I/O, no side effects — so every rule can be unit tested
+without booting a site (the one sibling import, policy.ALWAYS_DENIED, is itself
+pure stdlib). See tests/test_mcp_guard.py.
 
 This is the *second* line of defence. The first is the read-only MariaDB user in
 site_config (connection.py); that one is enforced by the database and cannot be
@@ -18,6 +19,8 @@ Design notes worth knowing before you edit:
 """
 
 import re
+
+from synapse.mcp_tools.policy import ALWAYS_DENIED
 
 __all__ = ["UnsafeQuery", "MAX_QUERY_LENGTH", "BLOCKED_KEYWORDS", "BLOCKED_TABLES", "validate_read_only"]
 
@@ -62,6 +65,14 @@ BLOCKED_KEYWORDS = (
 	"shutdown",
 	"sleep",
 	"benchmark",
+	# Named-lock functions carry an underscore, so a bare `lock` word-boundary
+	# never fires on them. They cannot write, but a held lock is a timing side
+	# channel, so block them by their full names.
+	"get_lock",
+	"release_lock",
+	"release_all_locks",
+	"is_free_lock",
+	"is_used_lock",
 	"outfile",
 	"dumpfile",
 	"load_file",
@@ -69,19 +80,13 @@ BLOCKED_KEYWORDS = (
 )
 
 # Case-insensitive substring match. Tables holding secrets, tokens or anything
-# that would let a reader escalate. Extend per site with the site_config key
-# `mcp_sql_blocked_tables` rather than editing this tuple.
-BLOCKED_TABLES = (
-	"__auth",
-	"taboauth bearer token",
-	"taboauth authorization code",
-	"tabtoken cache",
-	"tabsocial login key",
-	"tabconnected app",
-	"tabwebhook",
-	"tabemail account",
-	"tabintegration request",
-)
+# that would let a reader escalate. Derived from policy.ALWAYS_DENIED so the SQL
+# tool and the document tools block exactly the same set and cannot drift — a
+# DocType named there as "oauth client" becomes the table "taboauth client".
+# `__auth` is a framework table, not a DocType, so it is added explicitly.
+# Extend per site with the site_config key `mcp_sql_blocked_tables` rather than
+# editing this tuple or ALWAYS_DENIED.
+BLOCKED_TABLES = ("__auth",) + tuple(f"tab{name}" for name in sorted(ALWAYS_DENIED))
 
 _COMMENT_MARKERS = ("--", "#", "/*", "*/")
 

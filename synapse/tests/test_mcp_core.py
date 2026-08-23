@@ -131,6 +131,22 @@ class TestArgumentValidation(unittest.TestCase):
 
 		validate_arguments({"rate": 5}, build_input_schema(numeric))
 
+	def test_whole_number_float_satisfies_integer_and_is_coerced(self):
+		def paged(limit: int):
+			pass
+
+		schema = build_input_schema(paged)
+		out = validate_arguments({"limit": 5.0}, schema)
+		self.assertEqual(out["limit"], 5)
+		self.assertIsInstance(out["limit"], int)
+
+	def test_fractional_float_still_rejected_for_integer(self):
+		def paged(limit: int):
+			pass
+
+		with self.assertRaises(InvalidArguments):
+			validate_arguments({"limit": 5.5}, build_input_schema(paged))
+
 	def test_null_allowed_where_optional(self):
 		args = {"doctype": "Task", "name": "T", "values": {}, "filters": None}
 		validate_arguments(args, self.schema)

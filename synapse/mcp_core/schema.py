@@ -181,33 +181,44 @@ def validate_arguments(arguments: dict, schema: dict) -> dict:
 	if missing := sorted(set(schema.get("required") or []) - set(arguments)):
 		raise InvalidArguments(f"Missing required argument(s): {', '.join(missing)}.")
 
+	coerced = dict(arguments)
 	for key, value in arguments.items():
-		_check_type(key, value, properties[key])
+		coerced[key] = _check_type(key, value, properties[key])
 
-	return arguments
+	return coerced
 
 
 def _check_type(key: str, value: Any, spec: dict):
+	"""Validate one argument against its schema type; return it, coerced if needed."""
+
 	expected = spec.get("type")
 
 	if expected is None:
 		# {} (Any) or an anyOf branch we do not narrow. Let the tool decide.
-		return
+		return value
 
 	names = expected if isinstance(expected, list) else [expected]
 	allowed = tuple(t for name in names for t in _as_tuple(_JSON_TO_PY.get(name)))
 
 	if not allowed:
-		return
+		return value
 
 	# bool passes isinstance(x, int); JSON numbers are not booleans.
 	if isinstance(value, bool) and "boolean" not in names:
 		raise InvalidArguments(f"Argument '{key}' must be {' or '.join(names)}, got boolean.")
 
+	# JSON has one number type, so a whole-number float (5.0) is a valid integer.
+	# The schema layer's own contract says integer means the number type; accept
+	# and coerce it rather than rejecting what a compliant client legitimately sends.
+	if "integer" in names and isinstance(value, float) and value.is_integer():
+		return int(value)
+
 	if not isinstance(value, allowed):
 		raise InvalidArguments(
 			f"Argument '{key}' must be {' or '.join(names)}, got {type(value).__name__}."
 		)
+
+	return value
 
 
 def _as_tuple(value) -> tuple:

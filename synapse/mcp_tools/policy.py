@@ -66,8 +66,10 @@ MODES = (ALLOWLIST, DENYLIST)
 
 # Never reachable in denylist mode, for any action, listed or not. Tokens,
 # credentials and the plumbing that hands them out — reading these is how a
-# reader becomes a writer. Mirrors guard.BLOCKED_TABLES, which does the same job
-# for the raw SQL tool. Compared case insensitively.
+# reader becomes a writer — plus Synapse's own control plane, so an agent can
+# never rewrite the gate that governs it. guard.BLOCKED_TABLES is derived from
+# this set (see guard.py) so the raw SQL tool blocks the same tables and the two
+# can never drift. Compared case insensitively.
 ALWAYS_DENIED = frozenset(
 	{
 		"oauth bearer token",
@@ -81,6 +83,13 @@ ALWAYS_DENIED = frozenset(
 		"integration request",
 		"user social login",
 		"access log",
+		# Synapse's control plane. Blocking it here stops an agent whose user is
+		# a System Manager from editing the gate through the write tools.
+		"mcp settings",
+		"mcp allowed doctype",
+		"mcp denied doctype",
+		"mcp role permission",
+		"mcp access log",
 	}
 )
 

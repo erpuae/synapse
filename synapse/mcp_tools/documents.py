@@ -370,7 +370,7 @@ def create_doc(doctype: str, values: dict):
 	"""
 
 	doctype = _gate(WRITE, doctype)
-	audit.current().sent(values)
+	audit.current().sent(values, _secret_fieldnames(doctype))
 
 	doc = frappe.new_doc(doctype)
 	doc.update(_prepare(doctype, values))
@@ -411,7 +411,8 @@ def update_doc(doctype: str, name: str, values: dict):
 
 	doctype = _gate(WRITE, doctype)
 	audit.current().target(doctype, name)
-	audit.current().sent(values)
+	secret_keys = _secret_fieldnames(doctype)
+	audit.current().sent(values, secret_keys)
 
 	prepared = _prepare(doctype, values)
 
@@ -426,7 +427,8 @@ def update_doc(doctype: str, name: str, values: dict):
 		{
 			key: {"from": before.get(key), "to": _out(doc.get(key))}
 			for key in prepared
-		}
+		},
+		secret_keys,
 	)
 	audit.current().rows(1)
 	return {"name": doc.name, "doctype": doctype, "updated_fields": sorted(prepared)}
@@ -531,7 +533,7 @@ def delete_doc(doctype: str, name: str):
 	doc = frappe.get_doc(doctype, name)
 	doc.check_permission("delete")
 	# The snapshot is the only trace left once the row is gone.
-	audit.current().sent(_document_dict(doc))
+	audit.current().sent(_document_dict(doc), _secret_fieldnames(doctype))
 
 	frappe.delete_doc(doctype, name)
 
@@ -579,13 +581,23 @@ def _meta(doctype: str):
 		raise Denied(f"'{doctype}' is not a DocType on this site.")
 
 
-def _prepare(doctype: str, values) -> dict:
-	"""Reject framework-owned fields, then convert dates for the database."""
+def _prepare(doctype: str, values, child: bool = False) -> dict:
+	"""Reject framework-owned fields, then convert dates for the database.
+
+	On the parent a framework-owned field (docstatus, name, …) is an error worth
+	surfacing — the caller is trying to do something the tool deliberately does
+	not. On a **child row** those same fields are what a read-modify-write cycle
+	echoes back verbatim (get_doc returns child `name`, `parent`, `idx`), so
+	there they are stripped rather than fatal. Child tables are replaced whole,
+	so dropping the echoed row identity is correct anyway.
+	"""
 
 	if not isinstance(values, dict) or not values:
 		raise Denied("'values' must be a non-empty object of field names to values.")
 
-	if blocked := sorted(set(values) & PROTECTED_FIELDS):
+	if child:
+		values = {k: v for k, v in values.items() if k not in PROTECTED_FIELDS}
+	elif blocked := sorted(set(values) & PROTECTED_FIELDS):
 		raise Denied(
 			f"These fields are managed by the framework and cannot be set here: "
 			f"{', '.join(blocked)}. Use submit_doc or cancel_doc to change docstatus."
@@ -600,20 +612,53 @@ def _prepare(doctype: str, values) -> dict:
 		if df and df.fieldtype in ("Date", "Datetime"):
 			value = serialise.to_db_date(value)
 		elif df and df.fieldtype == "Table" and isinstance(value, list):
-			value = [_prepare(df.options, row) for row in value if isinstance(row, dict)]
+			value = [_prepare(df.options, row, child=True) for row in value if isinstance(row, dict)]
 
 		prepared[key] = value
 
 	return prepared
 
 
+def _secret_fieldnames(doctype: str, parent_only: bool = False) -> set:
+	"""Lowercased names of Password-fieldtype fields on a DocType.
+
+	Used both to strip secrets from get_doc output and to mask them in the audit
+	log by field type rather than by how the key happens to be spelled. Includes
+	child-table Password fields unless parent_only is set.
+	"""
+
+	meta = frappe.get_meta(doctype)
+	names = {df.fieldname.lower() for df in meta.fields if df.fieldtype == "Password"}
+
+	if parent_only:
+		return {df.fieldname for df in meta.fields if df.fieldtype == "Password"}
+
+	for table in meta.get_table_fields():
+		child_meta = frappe.get_meta(table.options)
+		names |= {df.fieldname.lower() for df in child_meta.fields if df.fieldtype == "Password"}
+
+	return names
+
+
 def _document_dict(doc) -> dict:
-	"""A document as JSON, with password fields left out."""
+	"""A document as JSON, with fields the caller may not read left out.
+
+	Two filters, in order:
+
+	* **permlevel.** `apply_fieldlevel_read_permissions` deletes fields above the
+	  caller's permlevel, on the parent and on child rows. Frappe's own read
+	  paths (frappe.client.get, the get_list query) all apply it; get_doc is the
+	  one that must apply it by hand, or it becomes the endpoint that leaks
+	  salary, cost and margin fields a get_list would have dropped.
+	* **Password fieldtype.** Stored in `__Auth`, never in the column, so
+	  as_dict only ever holds the `*****` dummy — but strip them anyway so not
+	  even the length leaks.
+	"""
+
+	doc.apply_fieldlevel_read_permissions()
 
 	data = doc.as_dict(no_nulls=False)
-	secret_fields = {df.fieldname for df in doc.meta.fields if df.fieldtype == "Password"}
-
-	for fieldname in secret_fields:
+	for fieldname in _secret_fieldnames(doc.doctype, parent_only=True):
 		data.pop(fieldname, None)
 
 	return _out(dict(data))
