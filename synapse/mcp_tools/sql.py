@@ -41,15 +41,22 @@ _TRAILING_LIMIT_RE = re.compile(r"\blimit\s+\d+\s*(?:,\s*\d+|offset\s+\d+)?\s*$"
 )
 @audit.audited(audit.SQL)
 def run_sql_query(query: str, limit: int | None = None):
-	"""Run a read-only SQL query against the ERPNext database and return rows.
+	"""Run a read-only SQL SELECT query against the ERPNext/Frappe database.
 
-	This ignores Frappe permissions entirely — prefer get_list and get_doc, and
-	use this only for joins or aggregates they cannot express.
+	Use this for joins, aggregates, GROUP BY, subqueries and cross-DocType
+	reconciliations — questions that span tables or summarise rows, which the
+	structured read tools cannot express. Returns the result rows.
 
 	Only SELECT and WITH statements are permitted. Table names follow the Frappe
-	convention of `tab` plus the DocType name, for example `tabSales Invoice`.
-	Child tables are separate tables joined on `parent`. Submitted documents have
-	docstatus = 1, drafts 0, cancelled 2.
+	convention of `tab` plus the DocType name, for example `tabSales Invoice`,
+	`tabGL Entry`, `tabStock Ledger Entry`. Child tables are separate tables
+	joined on `parent`. Submitted documents have docstatus = 1, drafts 0,
+	cancelled 2.
+
+	Note: this runs outside Frappe's permission system and returns every row the
+	query reaches regardless of DocType permissions, which is why it needs the
+	dedicated MCP SQL Reader role. For a single DocType filtered to what the
+	current user may see, use the structured read tools instead.
 
 	Comments and multiple statements are rejected outright rather than cleaned
 	up. A blocked keyword is matched on word boundaries against the whole query,
