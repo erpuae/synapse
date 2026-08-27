@@ -10,23 +10,25 @@
   "deny_write",
   "deny_submit",
   "deny_cancel",
-  "deny_delete"
+  "deny_delete",
+  "deny_operate"
  ],
  "fields": [
-  {"fieldname": "document_type", "fieldtype": "Link", "label": "DocType", "options": "DocType", "reqd": 1, "in_list_view": 1, "columns": 4},
+  {"fieldname": "document_type", "fieldtype": "Link", "label": "DocType", "options": "DocType", "reqd": 1, "in_list_view": 1, "columns": 3},
   {"fieldname": "deny_read", "fieldtype": "Check", "label": "Block Read", "default": "1", "in_list_view": 1, "columns": 1, "description": "Untick to leave the DocType readable while still blocking changes."},
   {"fieldname": "deny_write", "fieldtype": "Check", "label": "Block Write", "default": "1", "in_list_view": 1, "columns": 1},
   {"fieldname": "deny_submit", "fieldtype": "Check", "label": "Block Submit", "default": "1", "in_list_view": 1, "columns": 1},
   {"fieldname": "deny_cancel", "fieldtype": "Check", "label": "Block Cancel", "default": "1", "in_list_view": 1, "columns": 1},
-  {"fieldname": "deny_delete", "fieldtype": "Check", "label": "Block Delete", "default": "1", "in_list_view": 1, "columns": 1}
+  {"fieldname": "deny_delete", "fieldtype": "Check", "label": "Block Delete", "default": "1", "in_list_view": 1, "columns": 1},
+  {"fieldname": "deny_operate", "fieldtype": "Check", "label": "Block Operate", "default": "1", "in_list_view": 1, "columns": 1}
  ],
  "index_web_pages_for_search": 0,
  "istable": 1,
  "links": [],
- "modified": "2026-08-20 00:00:00.000000",
+ "modified": "2026-08-25 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Synapse",
- "name": "MCP Denied DocType",
+ "name": "Synapse Denied DocType",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "creation",

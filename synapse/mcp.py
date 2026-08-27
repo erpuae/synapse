@@ -10,8 +10,8 @@ OAuth Client record being made by hand — see the README for the three OAuth
 Settings switches that has to be turned on.
 
 `allow_guest` is left at False, so an unauthenticated POST is refused by the
-framework before any tool code runs. Everything past that point is per tool:
-a role on the tool itself, then the MCP allowlist, then Frappe's permissions.
+framework before any tool code runs. Everything past that point is per call:
+the Synapse access model (the caller's profiles), then Frappe's permissions.
 
 The server is vendored in synapse/mcp_core rather than installed from
 frappe-mcp; that module's docstring explains why.

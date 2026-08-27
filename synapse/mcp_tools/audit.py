@@ -1,5 +1,5 @@
 # Copyright (c) 2026, Dxbitz and contributors
-"""The MCP access log — one row for every call, read or write, allowed or not.
+"""The Synapse Log — one row for every call, read or write, allowed or not.
 
 Every tool is wrapped in @audited. The wrapper owns four things the tools should
 not each reimplement:
@@ -29,10 +29,11 @@ import frappe
 
 from synapse.mcp_tools.policy import Denied
 
-LOG_DOCTYPE = "MCP Access Log"
+LOG_DOCTYPE = "Synapse Log"
 
 READ = "Read"
 WRITE = "Write"
+OPERATE = "Operate"
 SQL = "SQL"
 OTHER = "Other"
 

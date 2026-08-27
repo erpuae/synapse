@@ -7,16 +7,20 @@ through Document.insert/save/submit/cancel so validations, hooks and workflows
 all fire exactly as they would in the desk. An agent using these tools can do
 what its user can do, and no more.
 
-On top of that sits the MCP allowlist (policy.py): the DocType must be listed
-for the action, and the user must hold a role the site has granted that action
-to. See the MCP section of the README.
+On top of that sits the Synapse access model (policy.py): the DocType and the
+action must be granted by one of the caller's Synapse Profiles, and the site
+backstop must not take it back. See the Access section of the README.
+
+`run_operation` calls a document's own method by name. That is the one tool with
+the reach of arbitrary code, so it is not gated like the others: its own
+`operate` action must be granted per DocType in a profile, which is the allowlist
+that makes it safe to expose at all. Everything it does still runs as the user,
+under Frappe permissions, and is logged.
 
 Deliberately not exposed:
 
 * `frappe.db.set_value` — skips validation and hooks. `set_value` here loads the
   document and saves it, so a scripted field stays correct.
-* Arbitrary whitelisted method execution. That is a remote shell in a trenchcoat,
-  and there is no allowlist granular enough to make it safe.
 * Rename and amend. Add them when a real case turns up, with their own flags.
 """
 
@@ -29,7 +33,7 @@ from synapse.mcp_tools.policy import (
 	ACTIONS,
 	CANCEL,
 	DELETE,
-	DENYLIST,
+	OPERATE,
 	READ,
 	SUBMIT,
 	WRITE,
@@ -37,8 +41,6 @@ from synapse.mcp_tools.policy import (
 	actions_possible,
 	check,
 )
-
-AGENT_ROLE = "MCP Agent"
 
 # Fields the framework owns. Letting a caller set docstatus would turn update
 # into an unaudited submit, which is the whole point of having a submit tool.
@@ -72,7 +74,6 @@ _ORDER_DIRECTIONS = ("asc", "desc")
 
 # ── discovery ─────────────────────────────────────────────────────────────────
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="List reachable DocTypes", readOnlyHint=True),
 	enabled=settings.read_tools_enabled,
 )
@@ -80,24 +81,24 @@ _ORDER_DIRECTIONS = ("asc", "desc")
 def list_available_doctypes():
 	"""List the DocTypes this endpoint can reach and what may be done to each.
 
-	Call this first. The result already accounts for the site's allowlist and
-	for the calling user's own roles, so anything absent here will be refused.
-	It does not account for User Permissions, which are applied per record when
-	a document is actually read or written.
+	Call this first. The result is the union of your Synapse Profiles, already
+	adjusted for the site's switches and backstop, so anything absent here will
+	be refused. It does not account for User Permissions, which are applied per
+	record when a document is actually read or written.
 	"""
 
 	policy = settings.get_policy()
-	roles = frappe.get_roles(frappe.session.user)
 
-	if policy.mode == DENYLIST:
-		return _denylist_summary(policy, roles)
+	if policy.full_access:
+		return _full_access_summary(policy)
 
 	available = []
-	for doctype in sorted(policy.doctypes):
+	for key in sorted(policy.grants):
+		doctype = policy.grant_names.get(key, key)
 		actions = []
 		for action in ACTIONS:
 			try:
-				check(policy, action, doctype, roles)
+				check(policy, action, doctype)
 			except Denied:
 				continue
 			actions.append(action)
@@ -110,7 +111,6 @@ def list_available_doctypes():
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="Describe a DocType", readOnlyHint=True),
 	enabled=settings.read_tools_enabled,
 )
@@ -121,7 +121,7 @@ def describe_doctype(doctype: str):
 	Layout fields are omitted. `options` carries the linked DocType for Link
 	fields, the child DocType for Table fields, and the newline-separated choices
 	for Select fields. Dates are returned in the format this site has configured
-	for MCP, ISO by default; writes accept either ISO or DD-MM-YYYY whatever the
+	for Synapse, ISO by default; writes accept either ISO or DD-MM-YYYY whatever the
 	output format is.
 
 	Args:
@@ -146,8 +146,8 @@ def describe_doctype(doctype: str):
 	}
 
 
-def _denylist_summary(policy, roles) -> dict:
-	"""Discovery in denylist mode.
+def _full_access_summary(policy) -> dict:
+	"""Discovery for a caller whose profile grants Full Access.
 
 	Every DocType on the site is reachable, so listing them would return the
 	whole schema and tell the model nothing useful. What it needs instead is
@@ -155,7 +155,7 @@ def _denylist_summary(policy, roles) -> dict:
 	that its own permissions are the real limit.
 	"""
 
-	possible = list(actions_possible(policy, roles))
+	possible = list(actions_possible(policy))
 
 	blocked = []
 	for name in sorted(policy.denied):
@@ -164,15 +164,15 @@ def _denylist_summary(policy, roles) -> dict:
 
 	audit.current().rows(len(blocked))
 	return {
-		"mode": "denylist",
+		"mode": "full_access",
 		"actions_possible": possible,
 		"blocked_doctypes": blocked,
 		"note": (
-			"Every other DocType on this site is reachable for the actions listed in "
-			"actions_possible, subject to your own Frappe permissions, which are applied "
-			"per record. Token and credential DocTypes are always blocked, and schema, "
-			"code and permission DocTypes are always read only. Use describe_doctype to "
-			"see a DocType's fields."
+			"Your profile grants full access, so every DocType on this site is reachable "
+			"for the actions listed in actions_possible, subject to your own Frappe "
+			"permissions, which are applied per record. Token and credential DocTypes are "
+			"always blocked, and schema, code and permission DocTypes are always read only. "
+			"Use describe_doctype to see a DocType's fields."
 		),
 	}
 
@@ -198,7 +198,6 @@ def _field_info(df) -> dict:
 
 # ── reads ─────────────────────────────────────────────────────────────────────
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="Get a document", readOnlyHint=True),
 	enabled=settings.read_tools_enabled,
 )
@@ -222,7 +221,6 @@ def get_doc(doctype: str, name: str):
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="Get one field value", readOnlyHint=True),
 	enabled=settings.read_tools_enabled,
 )
@@ -261,7 +259,6 @@ def get_value(doctype: str, fieldname: str, name: str | None = None, filters: di
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="List documents", readOnlyHint=True),
 	enabled=settings.read_tools_enabled,
 )
@@ -286,7 +283,7 @@ def get_list(
 			{"status": ["in", ["Open", "Overdue"]]}.
 		fields: Field names to return. Defaults to name and the title field.
 		order_by: "fieldname asc" or "fieldname desc".
-		limit: Rows to return. Clamped to the site's MCP row limit.
+		limit: Rows to return. Clamped to the site's Synapse row limit.
 		start: Rows to skip, for paging.
 	"""
 
@@ -316,7 +313,6 @@ def get_list(
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="Count documents", readOnlyHint=True),
 	enabled=settings.read_tools_enabled,
 )
@@ -349,7 +345,6 @@ def get_count(doctype: str, filters: dict | None = None):
 
 # ── writes ────────────────────────────────────────────────────────────────────
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	# Additive: it adds a row and overwrites nothing, so destructiveHint stays
 	# false. That is the honest distinction from update_doc, not a judgement that
 	# creating matters less.
@@ -382,7 +377,6 @@ def create_doc(doctype: str, values: dict):
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(
 		title="Update a document",
 		readOnlyHint=False,
@@ -400,7 +394,7 @@ def update_doc(doctype: str, name: str, values: dict):
 	"""Change fields on an existing document and save it.
 
 	Only the fields given are touched. The before and after values of each are
-	written to the MCP Access Log.
+	written to the Synapse Log.
 
 	Args:
 		doctype: The DocType to update.
@@ -435,7 +429,6 @@ def update_doc(doctype: str, name: str, values: dict):
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(
 		title="Set one field",
 		readOnlyHint=False,
@@ -464,7 +457,6 @@ def set_value(doctype: str, name: str, fieldname: str, value=None):
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="Submit a document", readOnlyHint=False, idempotentHint=True),
 	enabled=settings.write_tools_enabled,
 )
@@ -489,7 +481,6 @@ def submit_doc(doctype: str, name: str):
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="Cancel a document", readOnlyHint=False, destructiveHint=True),
 	enabled=settings.write_tools_enabled,
 )
@@ -514,7 +505,6 @@ def cancel_doc(doctype: str, name: str):
 
 
 @mcp.tool(
-	roles=[AGENT_ROLE],
 	annotations=ToolAnnotations(title="Delete a document", readOnlyHint=False, destructiveHint=True),
 	enabled=settings.write_tools_enabled,
 )
@@ -541,15 +531,337 @@ def delete_doc(doctype: str, name: str):
 	return {"name": name, "doctype": doctype, "deleted": True}
 
 
-# ── gates and validation ──────────────────────────────────────────────────────
-def _gate(action: str, doctype: str) -> str:
-	"""Resolve the DocType, run gate 3, record the target. Raises Denied.
+# ── child tables ──────────────────────────────────────────────────────────────
+# update_doc replaces a whole child table, which means resending every row to
+# change one. These three edit a table in place: cheaper on tokens, and they do
+# not silently drop rows the caller forgot to echo back.
+@mcp.tool(
+	annotations=ToolAnnotations(title="Add a child row", readOnlyHint=False, destructiveHint=False),
+	enabled=settings.write_tools_enabled,
+)
+@audit.audited(audit.WRITE)
+def add_child(doctype: str, name: str, table_field: str, values: dict):
+	"""Append one row to a child table and save the parent.
 
-	Resolving first matters. Models get capitalisation wrong constantly, and in
-	denylist mode a name that reached the policy unresolved would be compared
-	against the list as the caller spelled it. The policy matches case
-	insensitively too, but the name also has to be right by the time it reaches
-	the database, so it is canonicalised here once and used everywhere after.
+	Args:
+		doctype: The parent DocType, for example "Sales Invoice".
+		name: The parent document name.
+		table_field: The child-table fieldname on the parent, for example "items".
+		values: Field values for the new row.
+	"""
+
+	doctype = _gate(WRITE, doctype)
+	audit.current().target(doctype, name)
+
+	child_doctype = _child_doctype(doctype, table_field)
+	secret_keys = _secret_fieldnames(child_doctype)
+	audit.current().sent({table_field: [values]}, secret_keys)
+
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("write")
+
+	row = doc.append(table_field, _prepare(child_doctype, values, child=True))
+	doc.save()
+
+	audit.current().rows(1)
+	return {
+		"name": doc.name,
+		"doctype": doctype,
+		"table_field": table_field,
+		"row_name": row.name,
+		"idx": row.idx,
+	}
+
+
+@mcp.tool(
+	annotations=ToolAnnotations(
+		title="Set a child row field",
+		readOnlyHint=False,
+		destructiveHint=True,
+		idempotentHint=True,
+	),
+	enabled=settings.write_tools_enabled,
+)
+@audit.audited(audit.WRITE)
+def set_child_value(doctype: str, name: str, table_field: str, row: str, field: str, value=None):
+	"""Set one field on one existing child row and save the parent.
+
+	Args:
+		doctype: The parent DocType.
+		name: The parent document name.
+		table_field: The child-table fieldname on the parent, for example "items".
+		row: Which row — its row name, or its 1-based position (idx) as shown by
+			get_doc.
+		field: The child field to set.
+		value: The new value. Dates may be YYYY-MM-DD or DD-MM-YYYY.
+	"""
+
+	doctype = _gate(WRITE, doctype)
+	audit.current().target(doctype, name)
+
+	child_doctype = _child_doctype(doctype, table_field)
+	if field in PROTECTED_FIELDS:
+		raise Denied(f"'{field}' is managed by the framework and cannot be set here.")
+
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("write")
+
+	child = _find_child(doc, table_field, row)
+	prepared = _prepare(child_doctype, {field: value}, child=True)
+	if field not in prepared:
+		raise Denied(f"'{field}' cannot be set on {child_doctype}.")
+
+	secret_keys = _secret_fieldnames(child_doctype)
+	before = _out(child.get(field))
+	child.set(field, prepared[field])
+	doc.save()
+
+	audit.current().changed({f"{table_field}[{child.idx}].{field}": {"from": before, "to": _out(child.get(field))}}, secret_keys)
+	audit.current().rows(1)
+	return {"name": doc.name, "doctype": doctype, "table_field": table_field, "row_name": child.name, "field": field}
+
+
+@mcp.tool(
+	annotations=ToolAnnotations(title="Delete a child row", readOnlyHint=False, destructiveHint=True),
+	enabled=settings.write_tools_enabled,
+)
+@audit.audited(audit.WRITE)
+def delete_child(doctype: str, name: str, table_field: str, row: str):
+	"""Remove one row from a child table and save the parent.
+
+	Args:
+		doctype: The parent DocType.
+		name: The parent document name.
+		table_field: The child-table fieldname on the parent.
+		row: Which row — its row name, or its 1-based position (idx).
+	"""
+
+	doctype = _gate(WRITE, doctype)
+	audit.current().target(doctype, name)
+
+	child_doctype = _child_doctype(doctype, table_field)
+
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("write")
+
+	child = _find_child(doc, table_field, row)
+	# The snapshot is the only trace left once the row is gone.
+	audit.current().sent({f"{table_field}[{child.idx}]": child.as_dict()}, _secret_fieldnames(child_doctype))
+
+	doc.remove(child)
+	doc.save()
+
+	audit.current().rows(1)
+	return {"name": doc.name, "doctype": doctype, "table_field": table_field, "deleted_row": row}
+
+
+# ── careful text replace ──────────────────────────────────────────────────────
+@mcp.tool(
+	annotations=ToolAnnotations(
+		title="Replace text in a field",
+		readOnlyHint=False,
+		# Overwrites part of a field. Not idempotent — running it again replaces
+		# a different span, or none, so the count guard below is the safety.
+		destructiveHint=True,
+	),
+	enabled=settings.write_tools_enabled,
+)
+@audit.audited(audit.WRITE)
+def replace_in_field(doctype: str, name: str, field: str, find: str, replace: str, expect_count: int = 1):
+	"""Replace occurrences of a substring inside one text field, carefully.
+
+	This exists so a model can edit part of a long field without rewriting the
+	whole value. It is deliberately strict: it counts how many times `find`
+	occurs and refuses unless that count is exactly `expect_count`. So a replace
+	meant to hit one place will not silently rewrite five, and a `find` that has
+	drifted out of the text fails loudly instead of doing nothing.
+
+	Set `expect_count` to the number of occurrences you actually intend to
+	replace — check first with get_doc if unsure. Refuses an empty `find`, and a
+	no-op where `find` equals `replace`.
+
+	Args:
+		doctype: The DocType.
+		name: The document name.
+		field: The text field to edit.
+		find: The exact substring to look for.
+		replace: The text to put in its place.
+		expect_count: The exact number of occurrences expected. Default 1.
+	"""
+
+	doctype = _gate(WRITE, doctype)
+	audit.current().target(doctype, name)
+
+	if not isinstance(find, str) or find == "":
+		raise Denied("'find' must be a non-empty string.")
+	if not isinstance(replace, str):
+		raise Denied("'replace' must be a string.")
+	if find == replace:
+		raise Denied("'find' and 'replace' are identical — nothing to do.")
+
+	meta = frappe.get_meta(doctype)
+	df = meta.get_field(field)
+	if not df or df.fieldtype in LAYOUT_FIELDTYPES or df.fieldtype == "Table":
+		raise Denied(f"'{field}' is not an editable field on {doctype}.")
+	if field in PROTECTED_FIELDS:
+		raise Denied(f"'{field}' is managed by the framework and cannot be edited here.")
+
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("write")
+
+	current = doc.get(field)
+	if not isinstance(current, str):
+		raise Denied(f"'{field}' does not hold text, so it cannot be replaced into.")
+
+	count = current.count(find)
+	if count != expect_count:
+		raise Denied(
+			f"Found {count} occurrence(s) of that text in '{field}', but expect_count is "
+			f"{expect_count}. Refusing rather than replacing the wrong amount. Read the "
+			"field with get_doc and set expect_count to the real number."
+		)
+
+	updated = current.replace(find, replace)
+	secret_keys = _secret_fieldnames(doctype)
+	doc.set(field, updated)
+	doc.save()
+
+	audit.current().changed({field: {"from": _out(current), "to": _out(updated)}}, secret_keys)
+	audit.current().rows(count)
+	return {"name": doc.name, "doctype": doctype, "field": field, "replaced": count}
+
+
+# ── custom operation runner ───────────────────────────────────────────────────
+# The one tool that runs a document's own code. Its `operate` action is granted
+# per DocType in a Synapse Profile — that grant is the allowlist that makes this
+# safe to expose. Framework mutators that have their own gated tools are blocked
+# so operate can never be a side door around submit, delete and the rest.
+BLOCKED_OPERATIONS = frozenset(
+	{
+		"insert",
+		"save",
+		"submit",
+		"cancel",
+		"delete",
+		"delete_doc",
+		"save_version",
+		"db_insert",
+		"db_update",
+		"db_set",
+		"set_value",
+		"rename",
+		"run_method",
+	}
+)
+
+
+@mcp.tool(
+	annotations=ToolAnnotations(title="Run a document operation", readOnlyHint=False, destructiveHint=True),
+	enabled=settings.operate_tools_enabled,
+)
+@audit.audited(audit.OPERATE)
+def run_operation(doctype: str, name: str, operation: str, args: dict | None = None, save: bool = False):
+	"""Call one of a document's own methods, for actions the field tools cannot do.
+
+	Some documents carry behaviour beyond their fields — a Sales Invoice can
+	repost its accounting entries, a Stock Entry can recalculate valuation. This
+	runs such a method through the framework's own dispatcher, so its hooks fire
+	as they would from a desk button. It runs as you, under your permissions.
+
+	The method must be granted: this needs the `operate` action on the DocType in
+	one of your Synapse profiles. Methods that have their own dedicated tool
+	(save, submit, cancel, delete …) are refused here, and so is anything
+	private. Most operations save themselves; pass save=true only for one that
+	changes the document in memory and leaves saving to the caller.
+
+	Args:
+		doctype: The DocType, for example "Sales Invoice".
+		name: The document name.
+		operation: The method to call, for example "repost_accounting_entries".
+		args: Optional keyword arguments passed to the method.
+		save: Save the document after the method runs. Default false.
+	"""
+
+	doctype = _gate(OPERATE, doctype)
+	audit.current().target(doctype, name)
+
+	if not operation or not isinstance(operation, str):
+		raise Denied("An operation (method name) is required.")
+
+	operation = operation.strip()
+	if operation.startswith("_"):
+		raise Denied("Private methods (leading underscore) cannot be run.")
+	if operation in BLOCKED_OPERATIONS:
+		raise Denied(
+			f"'{operation}' has its own tool or would bypass a gate, so it cannot be run "
+			"through run_operation."
+		)
+
+	if args is not None and not isinstance(args, dict):
+		raise Denied("'args' must be an object of keyword arguments.")
+
+	audit.current().sent({"operation": operation, "args": args or {}})
+
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("read")
+
+	fn = getattr(doc, operation, None)
+	if not callable(fn):
+		raise Denied(f"'{operation}' is not a method on {doctype}.")
+
+	result = doc.run_method(operation, **(args or {}))
+
+	if save:
+		doc.save()
+
+	audit.current().rows(1)
+	return {
+		"name": doc.name,
+		"doctype": doctype,
+		"operation": operation,
+		"docstatus": doc.docstatus,
+		"result": _out(result),
+	}
+
+
+# ── gates and validation ──────────────────────────────────────────────────────
+def _child_doctype(doctype: str, table_field: str) -> str:
+	"""The child DocType behind a Table field, or Denied if it is not one."""
+
+	meta = frappe.get_meta(doctype)
+	df = meta.get_field(table_field)
+	if not df or df.fieldtype != "Table":
+		raise Denied(f"'{table_field}' is not a child table on {doctype}.")
+	return df.options
+
+
+def _find_child(doc, table_field: str, row: str):
+	"""Locate one child row by its row name, then by 1-based idx. Raises Denied."""
+
+	rows = doc.get(table_field) or []
+	wanted = str(row).strip()
+
+	for r in rows:
+		if r.name and str(r.name) == wanted:
+			return r
+
+	if wanted.isdigit():
+		idx = int(wanted)
+		for r in rows:
+			if r.idx == idx:
+				return r
+
+	raise Denied(f"No row '{row}' in {table_field}. Give the row name or its idx from get_doc.")
+
+
+def _gate(action: str, doctype: str) -> str:
+	"""Resolve the DocType, run the access gate, record the target. Raises Denied.
+
+	Resolving first matters. Models get capitalisation wrong constantly, and a
+	name that reached the policy unresolved would be compared against the grants
+	as the caller spelled it. The policy matches case insensitively too, but the
+	name also has to be right by the time it reaches the database, so it is
+	canonicalised here once and used everywhere after.
 	"""
 
 	meta = _meta(doctype)
@@ -559,12 +871,7 @@ def _gate(action: str, doctype: str) -> str:
 			f"'{meta.name}' is a child table. Read or write it through its parent document."
 		)
 
-	resolved = check(
-		settings.get_policy(),
-		action,
-		meta.name,
-		frappe.get_roles(frappe.session.user),
-	)
+	resolved = check(settings.get_policy(), action, meta.name)
 	audit.current().target(resolved)
 	return resolved
 

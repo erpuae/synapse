@@ -1,20 +1,23 @@
 # Copyright (c) 2026, Dxbitz and contributors
-"""Readiness check for the MCP endpoint.
+"""Readiness check for the Synapse endpoint.
 
 	bench --site <site> execute synapse.mcp_tools.check.report
 
 Prints what is configured and what is missing, in the order it has to be fixed.
 Everything it looks at is site configuration rather than app code, which is the
-part `bench install-app` cannot do for you: the OAuth switches, the role
-assignments, the allowlist and the optional read-only database user.
+part `bench install-app` cannot do for you: the OAuth switches, the settings
+switches, the Synapse Profiles that grant access, and the optional read-only
+database user.
 
-Read-only. It reports, it never changes anything.
+Read-only. It reports, it never changes anything. It reads the raw configuration
+rather than a resolved policy, so what it shows is the site's setup, not any one
+user's effective access.
 """
 
 import frappe
 
 from synapse.mcp_tools import connection, settings
-from synapse.mcp_tools.policy import ACTIONS, DENYLIST
+from synapse.mcp_tools.policy import ACTIONS
 
 OAUTH_FLAGS = (
 	("show_auth_server_metadata", "OAuth server metadata (/.well-known/oauth-authorization-server)"),
@@ -22,11 +25,18 @@ OAUTH_FLAGS = (
 	("enable_dynamic_client_registration", "Dynamic client registration"),
 )
 
-AGENT_ROLE = "MCP Agent"
-SQL_ROLE = "MCP SQL Reader"
-
 
 def report():
+	"""Print the readiness report. Called from `bench execute`."""
+
+	# Printed, not returned — `bench execute` echoes a return value, which would
+	# dump the whole report a second time as one escaped string.
+	print(report_text())
+
+
+def report_text() -> str:
+	"""Build the readiness report as one string. Reused by the console page."""
+
 	lines = []
 	ok = "  ok  "
 	no = " MISS "
@@ -43,57 +53,52 @@ def report():
 	lines.append("")
 
 	# ── settings ──
-	policy = settings.get_policy()
-	lines.append("MCP Settings")
-	lines.append(f"  [{ok if policy.enabled else no}] Endpoint enabled")
-	lines.append(f"  [{ok if policy.read_enabled else no}] Read tools")
-	lines.append(f"  [{'  on  ' if policy.write_enabled else ' off  '}] Write tools")
-	lines.append(f"  [{'  on  ' if settings.sql_tool_enabled() else ' off  '}] Read-only SQL tool")
+	s = frappe.get_single("Synapse Settings")
+	lines.append("Synapse Settings")
+	lines.append(f"  [{ok if s.enabled else no}] Endpoint enabled")
+	lines.append(f"  [{ok if s.enable_read_tools else no}] Read tools")
+	lines.append(f"  [{'  on  ' if s.enable_write_tools else ' off  '}] Write tools")
+	lines.append(f"  [{'  on  ' if s.enable_sql_tool else ' off  '}] Read-only SQL tool (also needs a profile with Allow SQL)")
+	lines.append(f"         Model provider: {settings.model_provider()}")
 	lines.append(f"         Row limit: {settings.row_limit()}   Retention: {settings.retention_days()} days")
-	lines.append(f"         Access mode: {policy.mode}")
 	lines.append("")
 
-	# ── the access list, whichever one is in force ──
-	if policy.mode == DENYLIST:
-		lines.append(f"DocType denylist ({len(policy.denied)} entries)")
-		lines.append("         Everything not listed is reachable. The user's own Frappe")
-		lines.append("         permissions are the working boundary.")
-		for name in sorted(policy.denied):
-			lines.append(f"         {name}: blocked for {', '.join(sorted(policy.denied[name]))}")
-		lines.append("         Plus always: token and credential DocTypes blocked outright,")
-		lines.append("         schema, code and permission DocTypes read only.")
-	else:
-		lines.append(f"DocType allowlist ({len(policy.doctypes)} entries)")
-		if not policy.doctypes:
-			lines.append(
-				"  [" + no + "] Empty — every document tool will refuse. Add DocTypes in "
-				"MCP Settings, or switch Access Mode to Denylist."
-			)
-		for name in sorted(policy.doctypes):
-			rule = policy.doctypes[name]
-			actions = [a for a in ACTIONS if rule.allows(a)]
-			lines.append(f"         {name}: {', '.join(actions) or 'nothing ticked'}")
+	# ── the backstop ──
+	denied = [row for row in s.get("denied_doctypes") or [] if row.document_type]
+	lines.append(f"Backstop — Blocked DocTypes ({len(denied)} entries)")
+	for row in sorted(denied, key=lambda r: r.document_type or ""):
+		blocked = [a for a in ACTIONS if row.get(f"deny_{a}")]
+		lines.append(f"         {row.document_type}: blocks {', '.join(blocked) or 'nothing ticked'}")
+	lines.append("         Plus always: token and credential DocTypes blocked outright,")
+	lines.append("         schema, code and permission DocTypes read only.")
 	lines.append("")
 
-	# ── roles ──
-	lines.append("Roles granted write actions in MCP Settings")
-	if not policy.role_actions:
-		lines.append("         none — the endpoint is read-only whatever the switches say")
-	for role, actions in sorted(policy.role_actions.items()):
-		lines.append(f"         {role}: {', '.join(sorted(actions))}")
-	lines.append("")
-
-	# ── role holders ──
-	lines.append("Role holders")
-	for role in (AGENT_ROLE, SQL_ROLE):
-		exists = bool(frappe.db.exists("Role", role))
-		holders = (
-			frappe.get_all("Has Role", filters={"role": role, "parenttype": "User"}, pluck="parent")
-			if exists
-			else []
+	# ── profiles, the grant ──
+	profiles = frappe.get_all("Synapse Profile", fields=["name", "enabled", "full_access", "allow_sql"], order_by="name")
+	enabled_profiles = [p for p in profiles if p.enabled]
+	lines.append(f"Synapse Profiles ({len(enabled_profiles)} enabled of {len(profiles)})")
+	if not enabled_profiles:
+		lines.append(
+			"  [" + no + "] No enabled profile — every document tool will refuse. "
+			"Create a Synapse Profile, add roles and DocType access."
 		)
-		mark = ok if exists else no
-		lines.append(f"  [{mark}] {role}: {len(holders)} user(s) {sorted(holders) or ''}")
+	for p in profiles:
+		doc = frappe.get_doc("Synapse Profile", p.name)
+		roles = [r.role for r in doc.get("roles") or []]
+		state = "enabled" if p.enabled else "disabled"
+		flags = []
+		if p.full_access:
+			flags.append("FULL ACCESS")
+		if p.allow_sql:
+			flags.append("SQL")
+		flag_str = f"  [{', '.join(flags)}]" if flags else ""
+		lines.append(f"         {p.name} ({state}){flag_str}")
+		lines.append(f"           roles: {', '.join(sorted(roles)) or 'none — grants nobody anything'}")
+		if not p.full_access:
+			access = doc.get("doctype_access") or []
+			for row in sorted(access, key=lambda r: r.document_type or ""):
+				actions = [a for a in ACTIONS if row.get(f"allow_{a}")]
+				lines.append(f"           {row.document_type}: {', '.join(actions) or 'nothing ticked'}")
 	lines.append("")
 
 	# ── read-only database user ──
@@ -106,6 +111,4 @@ def report():
 			"connection with a rollback, leaving guard.py as the only boundary."
 		)
 
-	# Printed, not returned — `bench execute` echoes a return value, which would
-	# dump the whole report a second time as one escaped string.
-	print("\n".join(lines))
+	return "\n".join(lines)

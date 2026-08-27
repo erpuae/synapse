@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:profile_name",
+ "creation": "2026-08-25 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "profile_name",
+  "enabled",
+  "column_break_head",
+  "full_access",
+  "allow_sql",
+  "intro_html",
+  "section_roles",
+  "roles",
+  "section_access",
+  "access_html",
+  "doctype_access"
+ ],
+ "fields": [
+  {"fieldname": "profile_name", "fieldtype": "Data", "label": "Profile Name", "reqd": 1, "in_list_view": 1, "description": "A label for this bundle of access, for example 'Sales Agent' or 'Read-only Reporting'."},
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "1", "in_list_view": 1, "description": "A disabled profile grants nothing, without deleting it."},
+  {"fieldname": "column_break_head", "fieldtype": "Column Break"},
+  {"fieldname": "full_access", "fieldtype": "Check", "label": "Full Access", "default": "0", "in_list_view": 1, "description": "Grants every action on every DocType, ignoring the grid below. The user's own Frappe permissions and the site backstop still apply. Assign only to a user whose Frappe permissions are already the limit you want."},
+  {"fieldname": "allow_sql", "fieldtype": "Check", "label": "Allow SQL", "default": "0", "in_list_view": 1, "description": "Lets the raw read-only SQL tool be used. That tool ignores DocType permissions entirely — grant only to users who already have full database access. Also needs the SQL switch in Synapse Settings."},
+  {"fieldname": "intro_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">A user's reach through Synapse is the <b>union</b> of every enabled profile whose roles they hold. Ticks here are a ceiling, not a grant — the user still needs the matching Frappe permission on each record.</p>"},
+
+  {"fieldname": "section_roles", "fieldtype": "Section Break", "label": "Roles"},
+  {"fieldname": "roles", "fieldtype": "Table", "label": "Roles", "options": "Synapse Profile Role", "description": "A user holding any of these roles is covered by this profile."},
+
+  {"fieldname": "section_access", "fieldtype": "Section Break", "label": "DocType Access", "depends_on": "eval:!doc.full_access"},
+  {"fieldname": "access_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">Each row lists a DocType and what may be done to it. Nothing is reachable unless it appears here (or Full Access is ticked). Every action beyond Read also needs 'Enable Write Tools' in Synapse Settings.</p>", "depends_on": "eval:!doc.full_access"},
+  {"fieldname": "doctype_access", "fieldtype": "Table", "label": "DocType Access", "options": "Synapse Doctype Access", "depends_on": "eval:!doc.full_access"}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-08-25 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Synapse",
+ "name": "Synapse Profile",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "print": 1, "email": 1, "share": 1, "report": 1, "export": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,27 +1,30 @@
 # Copyright (c) 2026, Dxbitz and contributors
-"""Reads MCP Settings and turns it into the pure Policy that policy.py checks.
+"""Builds the request's Policy from Synapse Settings and the caller's profiles.
 
-Cached on frappe.local for the life of the request. MCP Settings is a Single so
-frappe.get_cached_doc already serves it from redis; the local cache saves
-rebuilding the dataclasses on every tool call in a multi-call request.
+The Policy is user-scoped: a call's reach is the union of every enabled Synapse
+Profile whose roles the calling user holds. That is resolved here, once, and
+cached on frappe.local for the life of the request — a request is one user, so
+the cache is safe, and it saves rebuilding the union on every tool call in a
+multi-call request.
 """
 
 import frappe
 
-from synapse.mcp_tools.policy import ACTIONS, ALLOWLIST, MODES, DocTypeRule, Policy
+from synapse.mcp_tools.policy import ACTIONS, Policy
 from synapse.mcp_tools.serialise import DMY, ISO, Formats
 
-SETTINGS_DOCTYPE = "MCP Settings"
-CACHE_KEY = "_synapse_mcp_policy"
+SETTINGS_DOCTYPE = "Synapse Settings"
+PROFILE_DOCTYPE = "Synapse Profile"
+CACHE_KEY = "_synapse_policy"
 
-# The site can lower these in MCP Settings but never raise them past here.
+# The site can lower these in Synapse Settings but never raise them past here.
 HARD_ROW_CAP = 500
 DEFAULT_ROW_LIMIT = 100
 DEFAULT_RETENTION_DAYS = 90
 
 
 def get_policy() -> Policy:
-	"""Return this request's Policy, building it once."""
+	"""Return this request's Policy, building it once for the current user."""
 
 	cached = getattr(frappe.local, CACHE_KEY, None)
 	if cached is not None:
@@ -33,7 +36,7 @@ def get_policy() -> Policy:
 
 
 def clear_cache():
-	"""Called from MCP Settings.on_update so an edit takes effect immediately."""
+	"""Called from Synapse Settings/Profile on_update so an edit takes effect at once."""
 
 	if hasattr(frappe.local, CACHE_KEY):
 		delattr(frappe.local, CACHE_KEY)
@@ -47,19 +50,6 @@ def _build() -> Policy:
 		# defaulting open.
 		return Policy()
 
-	doctypes = {}
-	for row in doc.get("allowed_doctypes") or []:
-		if not row.document_type:
-			continue
-
-		doctypes[row.document_type] = DocTypeRule(
-			read=bool(row.allow_read),
-			write=bool(row.allow_write),
-			submit=bool(row.allow_submit),
-			cancel=bool(row.allow_cancel),
-			delete=bool(row.allow_delete),
-		)
-
 	denied = {}
 	for row in doc.get("denied_doctypes") or []:
 		if not row.document_type:
@@ -67,51 +57,122 @@ def _build() -> Policy:
 
 		blocked = {action for action in ACTIONS if row.get(f"deny_{action}")}
 		if blocked:
-			denied[row.document_type] = frozenset(blocked)
+			denied[_norm(row.document_type)] = frozenset(blocked)
 
-	role_actions = {}
-	for row in doc.get("role_permissions") or []:
-		if not row.role:
-			continue
-
-		granted = {action for action in ACTIONS if action != "read" and row.get(f"allow_{action}")}
-		if granted:
-			role_actions[row.role] = frozenset(granted)
-
-	# A site saved before the mode field existed has it empty. Allowlist is the
-	# safe reading of that, and it is what those sites were actually doing.
-	mode = doc.access_mode if doc.access_mode in MODES else ALLOWLIST
+	full_access, sql_access, grants, grant_names = _resolve_profiles()
 
 	return Policy(
 		enabled=bool(doc.enabled),
 		read_enabled=bool(doc.enable_read_tools),
 		write_enabled=bool(doc.enable_write_tools),
-		mode=mode,
-		doctypes=doctypes,
+		sql_enabled=bool(doc.enable_sql_tool) and sql_access,
+		full_access=full_access,
+		grants=grants,
+		grant_names=grant_names,
 		denied=denied,
-		role_actions=role_actions,
 	)
+
+
+def _resolve_profiles() -> tuple:
+	"""Union the enabled profiles whose roles the current user holds.
+
+	Returns (full_access, sql_access, grants, grant_names). `grants` maps a
+	normalised DocType name to the set of actions granted across those profiles;
+	`grant_names` keeps a display spelling for each. Full Access short-circuits
+	the grid — the grants map is left empty because policy.granted_actions treats
+	full_access as "every action on every DocType".
+	"""
+
+	roles = set(frappe.get_roles(frappe.session.user))
+
+	full_access = False
+	sql_access = False
+	grants: dict[str, set] = {}
+	grant_names: dict[str, str] = {}
+
+	names = frappe.get_all(PROFILE_DOCTYPE, filters={"enabled": 1}, pluck="name")
+	for name in names:
+		profile = frappe.get_cached_doc(PROFILE_DOCTYPE, name)
+
+		profile_roles = {row.role for row in profile.get("roles") or [] if row.role}
+		if not (profile_roles & roles):
+			continue
+
+		if profile.allow_sql:
+			sql_access = True
+
+		if profile.full_access:
+			full_access = True
+			continue
+
+		for row in profile.get("doctype_access") or []:
+			if not row.document_type:
+				continue
+
+			actions = {action for action in ACTIONS if row.get(f"allow_{action}")}
+			if not actions:
+				continue
+
+			key = _norm(row.document_type)
+			grants.setdefault(key, set()).update(actions)
+			grant_names.setdefault(key, row.document_type)
+
+	frozen = {key: frozenset(actions) for key, actions in grants.items()}
+	return full_access, sql_access, frozen, grant_names
 
 
 # ── predicates used as `enabled=` on tool registrations ───────────────────────
 def read_tools_enabled() -> bool:
+	"""Read tools are visible when reads are on and the caller has some grant.
+
+	A user with no matching profile sees no document tools rather than a listing
+	full of tools that would all refuse.
+	"""
+
 	policy = get_policy()
-	return policy.enabled and policy.read_enabled
+	return policy.enabled and policy.read_enabled and _has_any_grant(policy)
 
 
 def write_tools_enabled() -> bool:
 	policy = get_policy()
-	return policy.enabled and policy.write_enabled
+	return policy.enabled and policy.write_enabled and _has_write_grant(policy)
+
+
+def operate_tools_enabled() -> bool:
+	"""run_operation is visible only when the caller holds an 'operate' grant.
+
+	It shares the write master switch — operate is a write-class action — but it
+	is hidden from callers with no operate grant so the powerful tool never even
+	appears for a user who could not use it.
+	"""
+
+	policy = get_policy()
+	if not (policy.enabled and policy.write_enabled):
+		return False
+
+	if policy.full_access:
+		return True
+
+	return any("operate" in actions for actions in policy.grants.values())
 
 
 def sql_tool_enabled() -> bool:
-	if not get_policy().enabled:
-		return False
-
-	return bool(_value("enable_sql_tool"))
+	policy = get_policy()
+	return policy.enabled and policy.sql_enabled
 
 
-# ── numeric settings ──────────────────────────────────────────────────────────
+def _has_any_grant(policy: Policy) -> bool:
+	return bool(policy.full_access or policy.grants)
+
+
+def _has_write_grant(policy: Policy) -> bool:
+	if policy.full_access:
+		return True
+
+	return any(action != "read" for actions in policy.grants.values() for action in actions)
+
+
+# ── numeric and display settings ──────────────────────────────────────────────
 def row_limit(requested=None) -> int:
 	"""Clamp a caller's requested row count to the site's cap, then the hard cap."""
 
@@ -133,6 +194,12 @@ def output_formats() -> Formats:
 	"""
 
 	return DMY if _value("date_format") == "DD-MM-YYYY" else ISO
+
+
+def model_provider() -> str:
+	"""The model family the site presents Synapse for. Showcase only — no behaviour."""
+
+	return _value("model_provider") or "Claude"
 
 
 def log_payloads() -> bool:
@@ -157,3 +224,7 @@ def _int(value, fallback: int) -> int:
 		return fallback
 
 	return value or fallback
+
+
+def _norm(value) -> str:
+	return str(value or "").strip().lower()

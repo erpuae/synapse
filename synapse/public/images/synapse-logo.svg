@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 240" fill="none" role="img" aria-label="Synapse">
+  <g stroke="currentColor" stroke-width="10" stroke-linecap="round" fill="none" color="#0B0B0B">
+    <path d="M24 120 H117"/>
+    <path d="M236 120 H143"/>
+    <path d="M116 88 Q92 120 116 152"/>
+    <path d="M144 88 Q168 120 144 152"/>
+    <path d="M32 64 Q80 66 116 88"/>
+    <path d="M32 176 Q80 174 116 152"/>
+    <path d="M228 64 Q180 66 144 88"/>
+    <path d="M228 176 Q180 174 144 152"/>
+  </g>
+  <g fill="currentColor" color="#0B0B0B">
+    <circle cx="130" cy="120" r="13"/>
+    <circle cx="24" cy="120" r="12"/>
+    <circle cx="236" cy="120" r="12"/>
+    <circle cx="32" cy="64" r="12"/>
+    <circle cx="32" cy="176" r="12"/>
+    <circle cx="228" cy="64" r="12"/>
+    <circle cx="228" cy="176" r="12"/>
+  </g>
+  <text x="312" y="158" fill="currentColor" color="#0B0B0B"
+        font-family="Poppins, 'Century Gothic', 'Futura', 'Segoe UI', system-ui, sans-serif"
+        font-size="150" font-weight="400" letter-spacing="2">synapse</text>
+</svg>

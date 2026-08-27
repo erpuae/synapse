@@ -21,10 +21,10 @@ unacceptable on a business system. Synapse takes the opposite position:
   validations, hooks and workflows fire exactly as they do in the desk.
 - **A second boundary above permissions**, because "this user may edit Sales
   Invoices in the desk" and "an agent holding this user's token may edit Sales
-  Invoices" are different decisions.
+  Invoices" are different decisions. That boundary is the **Synapse Profile**.
 - **Everything is logged**, including calls refused before they reach a tool.
-- **No dependencies.** The MCP server is vendored, so `bench install-app` is the
-  whole installation and `bench update` stays safe.
+- **No dependencies, and no roles of its own.** The MCP server is vendored, so
+  `bench install-app` is the whole installation and `bench update` stays safe.
 
 ## Install
 
@@ -40,7 +40,8 @@ bench --site <your-site> execute synapse.mcp_tools.check.report
 ```
 
 It prints what is configured and what is missing, in the order it has to be
-fixed. A fresh install is fully closed: nothing is reachable until you say so.
+fixed. A fresh install is fully closed: no profile exists, so nothing is
+reachable until you make one.
 
 ## Tools
 
@@ -49,78 +50,117 @@ fixed. A fresh install is fully closed: nothing is reachable until you say so.
 | `list_available_doctypes`, `describe_doctype` | read |
 | `get_doc`, `get_value`, `get_list`, `get_count` | read |
 | `create_doc`, `update_doc`, `set_value` | write |
+| `add_child`, `set_child_value`, `delete_child` | write |
+| `replace_in_field` | write |
 | `submit_doc` | submit |
 | `cancel_doc` | cancel |
 | `delete_doc` | delete |
-| `run_sql_query` | the `MCP SQL Reader` role — see below |
+| `run_operation` | operate |
+| `run_sql_query` | a profile with **Allow SQL** — see below |
 
-Dates are returned in the format set in MCP Settings, ISO by default. Writes
+The child-table tools edit one row of a table in place, instead of `update_doc`
+replacing the whole table (which means resending every row to change one).
+`replace_in_field` edits part of a long text field and refuses unless the text
+it is asked to find occurs exactly the number of times the caller expected, so
+it can never quietly rewrite the wrong span. `run_operation` calls a document's
+own method — see **The operate action** below.
+
+Dates are returned in the format set in Synapse Settings, ISO by default. Writes
 accept ISO or DD-MM-YYYY either way, so a read-modify-write round trip cannot
 swap day and month.
 
 Deliberately **not** exposed: `frappe.db.set_value` (skips validation and hooks —
-the `set_value` tool loads and saves the document instead), arbitrary whitelisted
-method execution, rename and amend.
+the `set_value` tool loads and saves the document instead), rename and amend.
 
-## Four gates
+## Three gates
 
-Every call passes all four. They are independent, and the narrowest wins.
+Every call passes all three. They are independent, and the narrowest wins.
 
 1. **Authentication.** The endpoint is closed to guests, so an unauthenticated
    POST is refused by the framework before any tool code runs.
-2. **A role on the tool.** Document tools need `MCP Agent`, the SQL tool needs
-   `MCP SQL Reader`. Without the role the tool is not even listed.
-3. **The MCP access list** (MCP Settings), an allowlist or a denylist. For
-   anything other than a read, the caller must also hold a role the site has
-   granted that action to.
-4. **Frappe's own permissions**, as described above.
+2. **The Synapse access model.** A **Synapse Profile** whose roles the caller
+   holds must grant the DocType and the action, and the site backstop must not
+   take it back. See below.
+3. **Frappe's own permissions**, as described above. Every tool operates as the
+   session user with permissions on.
 
-Administrator is not exempt. It holds every role, so gates 2 and 3's role check
-pass, but the DocType list still binds.
+Synapse creates no roles. Whoever authenticates is the identity every tool runs
+as, so scope that user — and the profiles their roles fall under — to what the
+agent should see rather than using an Administrator.
 
-## Access Mode
+## Synapse Profiles
 
-**Allowlist** — nothing is reachable except the DocTypes listed, each with the
-actions ticked. Fails closed; a new DocType stays unreachable until someone says
-otherwise. This is the default, and a fresh install has an empty list, so nothing
-is reachable at all.
+Access is granted by **Synapse Profile** records. A profile lists some **roles**
+and the **DocTypes and actions** those roles may reach through the endpoint. A
+user's reach is the **union of every enabled profile whose roles they hold**.
 
-**Denylist** — every DocType is reachable except the ones listed. The user's own
-Frappe permissions become the working boundary, and the list carves out what no
-agent should touch whatever its user may do. Each row blocks everything by
-default; untick *Block Read* to leave a DocType readable but unchangeable.
+- With no matching profile, nothing is reachable — a fresh install is closed.
+- A tick in a profile is a ceiling, not a grant: the user still needs the
+  matching Frappe permission on the record, checked when the document is touched.
+- **Full Access** on a profile grants every action on every DocType, ignoring the
+  grid. The user's own Frappe permissions — already the boundary you scoped —
+  become the working limit. It is a deliberate choice, made per profile, not a
+  default.
+- **Allow SQL** on a profile turns on the raw SQL tool for its users. Read the
+  SQL section before ticking it.
 
-Denylist is easier to live with on a full ERP. Its cost is that a new DocType
-arrives reachable, so two sets are enforced in that mode whether or not anyone
-lists them:
+Above every profile sits a site-wide **backstop** in Synapse Settings, and two
+built-in sets that apply whether or not anyone lists them:
 
 - **Never reachable**: OAuth Bearer Token, OAuth Authorization Code, OAuth
   Client, Token Cache, Social Login Key, Connected App, Webhook, Email Account,
-  Integration Request, User Social Login, Access Log. Reading these is how a
-  reader becomes a writer.
+  Integration Request, User Social Login, Access Log, and Synapse's own control
+  plane (Settings, Profile and Log). Reading these is how a reader becomes a
+  writer, or rewrites the gate that governs it.
 - **Read only, always**: DocType, DocField, DocPerm, Custom DocPerm, Custom
   Field, Property Setter, Server Script, Client Script, Print Format, Report,
   Role, Has Role, User, User Permission, System Settings, Workflow, Scheduled Job
   Type. An agent that can edit Custom DocPerm can grant itself anything.
 
-In allowlist mode neither set applies — there the table is the only authority.
+The **Blocked DocTypes** table in Synapse Settings is the site-wide part of the
+backstop: carve-outs that no profile can override, for the things no agent should
+touch whatever its user may do. Each row blocks everything by default; untick
+*Block Read* to leave a DocType readable but unchangeable.
 
 Child tables are never reachable directly; they are read and written through
 their parent. Matching is case insensitive and the DocType name is canonicalised
-against the site before the list is consulted, so `salary slip` cannot slip past
-a row reading `Salary Slip`.
+against the site before the profiles are consulted, so `salary slip` cannot slip
+past a grant reading `Salary Slip`.
 
-To fill a large allowlist without ticking hundreds of grid rows:
+To fill a large profile without ticking hundreds of grid rows:
 
 ```bash
-bench --site <your-site> execute synapse.mcp_tools.allowlist.grant_all --kwargs "{'dry_run': 1}"
-bench --site <your-site> execute synapse.mcp_tools.allowlist.grant_all
-bench --site <your-site> execute synapse.mcp_tools.allowlist.show
+bench --site <your-site> execute synapse.mcp_tools.profiles.grant_all \
+  --kwargs "{'profile': 'Reporting', 'actions': 'read', 'dry_run': 1}"
+bench --site <your-site> execute synapse.mcp_tools.profiles.grant_all \
+  --kwargs "{'profile': 'Reporting', 'actions': 'read'}"
+bench --site <your-site> execute synapse.mcp_tools.profiles.show \
+  --kwargs "{'profile': 'Reporting'}"
 ```
 
 `grant_all` defaults to read only and applies the same two protected sets. If you
-want everything reachable, denylist mode with an empty list says that more
-honestly than 700 allowlist rows.
+want everything reachable, tick Full Access on the profile — it says that in one
+box rather than 700 rows, and it stays correct as the schema grows.
+
+## The operate action
+
+`run_operation` calls a document's **own method** by name — the behaviour a desk
+button triggers, like a Sales Invoice reposting its accounting entries. It is the
+one tool with the reach of arbitrary code, so it has its own action, **operate**,
+granted per DocType in a profile. That grant is the allowlist that makes it safe
+to expose: a profile has to say, for this DocType, that operations may run.
+
+It still runs as the calling user, under Frappe permissions, and is fully logged.
+Methods that have their own dedicated, gated tool (`save`, `submit`, `cancel`,
+`delete` …) are refused here, and so is anything private, so operate can never be
+a side door around the other gates.
+
+## The model provider
+
+Synapse Settings carries a **Model Provider** choice. Only Claude is wired up;
+the other options are placeholders that change nothing about how tools run. The
+setting records which model family the site presents Synapse for. Support beyond
+Claude is not implemented yet.
 
 ## Setting it up
 
@@ -134,15 +174,12 @@ the whole site's OAuth behaviour, not just MCP.
 Be clear about what a token grants: a Frappe OAuth token is not scoped to MCP. It
 authorises the whole `/api` surface as that user.
 
-**2. Assign `MCP Agent`** to the user the agent will act as. Whoever
-authenticates is the identity every tool runs as, so scope that user to what the
-agent should see rather than using an Administrator.
+**2. Create a Synapse Profile.** Add the roles the agent's user holds, and the
+DocTypes and actions those roles may reach. Reading needs only a read tick.
 
-**3. Fill in MCP Settings.** Tick *Enable MCP Endpoint*, choose *Access Mode*, and
-fill in the list it shows. Reads work at this point. For writes, also tick
-*Enable Write Tools* and grant the actions to specific roles in *Role
-Permissions*; with that table empty the endpoint stays read-only whatever else is
-set.
+**3. Fill in Synapse Settings.** Tick *Enable Synapse Endpoint* and *Enable Read
+Tools*. Reads work at this point. For writes, also tick *Enable Write Tools*;
+with that switch off the endpoint stays read-only whatever a profile grants.
 
 ## Connecting a client
 
@@ -156,15 +193,17 @@ Settings → Connectors → Add custom connector with the same URL.
 
 ## Raw SQL — read this before enabling it
 
-> `run_sql_query` bypasses Frappe's permission system completely. A user holding
-> `MCP SQL Reader` can read every table on the site regardless of their DocType
-> permissions. Grant it only to users who already have full database access.
+> `run_sql_query` bypasses Frappe's permission system completely. A user in a
+> profile with **Allow SQL** can read every table on the site regardless of their
+> DocType permissions. Grant it only to users who already have full database
+> access.
 
-It is off until *Enable Read-Only SQL Tool* is ticked, and it does not use the
-DocType access list — it cannot, since it never names a DocType. Prefer
-`get_list` and `get_doc`; reach for SQL only for a join or an aggregate they
-cannot express. If an agent is reaching for SQL constantly, the document tools
-are missing something it needs.
+It is off until *Enable Read-Only SQL Tool* is ticked in Synapse Settings **and**
+the caller holds a profile with *Allow SQL*. It does not use the profile's
+DocType grants — it cannot, since it never names a DocType. Prefer `get_list` and
+`get_doc`; reach for SQL only for a join or an aggregate they cannot express. If
+an agent is reaching for SQL constantly, the document tools are missing something
+it needs.
 
 Two layers stand behind it:
 
@@ -203,12 +242,12 @@ on other backends.
 
 ## Audit
 
-Every call writes an **MCP Access Log** row — success, refusal or error — with
-the tool, user, how they authenticated, IP, document touched, row counts and
-timing. Writes also record the submitted values and the before/after of each
-changed field. Calls refused before the tool body runs (unknown tool, missing
-role, arguments that do not fit) are logged too: an agent probing tools it has no
-rights to is exactly what an audit trail is for.
+Every call writes a **Synapse Log** row — success, refusal or error — with the
+tool, user, how they authenticated, IP, document touched, row counts and timing.
+Writes also record the submitted values and the before/after of each changed
+field. Calls refused before the tool body runs (unknown tool, arguments that do
+not fit) are logged too: an agent probing tools it has no rights to is exactly
+what an audit trail is for.
 
 **A call missing from the log entirely never reached the server.** If a tool
 appears blocked and the log has nothing for it, the block is in the client, most
@@ -228,8 +267,8 @@ password-like fields are masked either way.
 bench --site <your-site> run-tests --app synapse
 ```
 
-The access list, the SQL guard, the tool schemas and the value conversion import
-nothing from frappe, so they also run without a site:
+The access model, the SQL guard, the tool schemas and the value conversion
+import nothing from frappe, so they also run without a site:
 
 ```bash
 python -m unittest discover -s apps/synapse -p 'test_mcp_*.py'
