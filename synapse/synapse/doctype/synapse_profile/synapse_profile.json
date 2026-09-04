@@ -16,7 +16,10 @@
   "roles",
   "section_access",
   "access_html",
-  "doctype_access"
+  "doctype_access",
+  "section_custom_tools",
+  "custom_tools_html",
+  "custom_tools"
  ],
  "fields": [
   {"fieldname": "profile_name", "fieldtype": "Data", "label": "Profile Name", "reqd": 1, "in_list_view": 1, "description": "A label for this bundle of access, for example 'Sales Agent' or 'Read-only Reporting'."},
@@ -31,7 +34,11 @@
 
   {"fieldname": "section_access", "fieldtype": "Section Break", "label": "DocType Access", "depends_on": "eval:!doc.full_access"},
   {"fieldname": "access_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">Each row lists a DocType and what may be done to it. Nothing is reachable unless it appears here (or Full Access is ticked). Every action beyond Read also needs 'Enable Write Tools' in Synapse Settings.</p>", "depends_on": "eval:!doc.full_access"},
-  {"fieldname": "doctype_access", "fieldtype": "Table", "label": "DocType Access", "options": "Synapse Doctype Access", "depends_on": "eval:!doc.full_access"}
+  {"fieldname": "doctype_access", "fieldtype": "Table", "label": "DocType Access", "options": "Synapse Doctype Access", "depends_on": "eval:!doc.full_access"},
+
+  {"fieldname": "section_custom_tools", "fieldtype": "Section Break", "label": "Custom Tools"},
+  {"fieldname": "custom_tools_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">Tools contributed by other installed apps. List each by its exact name to let this profile's roles call it. This is separate from DocType access, and Full Access does not include it, because a custom tool can run any code its app wrote. The site also needs 'Enable Custom Tools' in Synapse Settings.</p>"},
+  {"fieldname": "custom_tools", "fieldtype": "Table", "label": "Allowed Custom Tools", "options": "Synapse Profile Tool"}
  ],
  "index_web_pages_for_search": 0,
  "links": [],

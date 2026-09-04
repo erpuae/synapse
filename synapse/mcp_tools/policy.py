@@ -90,6 +90,7 @@ ALWAYS_DENIED = frozenset(
 		"synapse settings",
 		"synapse profile",
 		"synapse profile role",
+		"synapse profile tool",
 		"synapse doctype access",
 		"synapse denied doctype",
 		"synapse log",
@@ -145,10 +146,12 @@ class Policy:
 	read_enabled: bool = False
 	write_enabled: bool = False
 	sql_enabled: bool = False
+	custom_enabled: bool = False
 	full_access: bool = False
 	grants: dict[str, frozenset] = field(default_factory=dict)
 	grant_names: dict[str, str] = field(default_factory=dict)
 	denied: dict[str, frozenset] = field(default_factory=dict)
+	custom_tools: frozenset = field(default_factory=frozenset)
 
 	def granted_actions(self, doctype: str) -> frozenset:
 		"""Actions the caller's profiles grant on a DocType, before the backstop."""

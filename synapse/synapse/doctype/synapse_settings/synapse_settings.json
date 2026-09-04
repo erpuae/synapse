@@ -14,6 +14,7 @@
   "enable_write_tools",
   "column_break_tools",
   "enable_sql_tool",
+  "enable_custom_tools",
   "max_rows",
   "date_format",
   "section_access",
@@ -37,6 +38,7 @@
   {"fieldname": "enable_write_tools", "fieldtype": "Check", "label": "Enable Write Tools", "default": "0", "description": "create_doc, update_doc, set_value, submit_doc, cancel_doc, delete_doc, the child-table tools, replace_in_field and run_operation"},
   {"fieldname": "column_break_tools", "fieldtype": "Column Break"},
   {"fieldname": "enable_sql_tool", "fieldtype": "Check", "label": "Enable Read-Only SQL Tool", "default": "0", "description": "Also needs a Synapse Profile with 'Allow SQL' ticked. Raw SQL ignores all DocType permissions."},
+  {"fieldname": "enable_custom_tools", "fieldtype": "Check", "label": "Enable Custom Tools", "default": "0", "description": "Turn on tools contributed by other installed apps. Each still has to be named in a Synapse Profile. Off means no custom tool runs, whatever a profile lists."},
   {"fieldname": "max_rows", "fieldtype": "Int", "label": "Row Limit", "default": "100", "description": "Rows any single call may return. Capped at 500 by the app."},
   {"fieldname": "date_format", "fieldtype": "Select", "label": "Date Format", "options": "ISO (YYYY-MM-DD)\nDD-MM-YYYY", "default": "ISO (YYYY-MM-DD)", "description": "How dates are returned to the client. Writes always accept either form, so changing this cannot break a round trip."},
 

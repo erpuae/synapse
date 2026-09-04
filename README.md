@@ -112,6 +112,58 @@ logged. Methods that already have their own tool (save, submit, cancel, delete
 and so on) are refused here, and so is anything private. So operate cannot be
 used to get around the other tools.
 
+## Custom tools
+
+Any installed app can add its own tools to the Synapse endpoint, so an app can
+expose the specific jobs it knows how to do rather than only the generic document
+tools. An app writes a function, marks it, and lists the module in its hooks:
+
+```python
+# in myapp/hooks.py
+synapse_tools = ["myapp.synapse_tools"]
+```
+
+```python
+# in myapp/synapse_tools.py
+import synapse
+
+@synapse.tool(read_only=True)
+def open_tasks_for(project: str) -> dict:
+    """Return the open tasks on a project.
+
+    The description and arguments the model sees come from this docstring and
+    the function signature.
+    """
+    import frappe
+    rows = frappe.get_list(
+        "Task",
+        filters={"project": project, "status": ["!=", "Completed"]},
+        fields=["name", "subject", "status"],
+    )
+    return {"project": project, "open_tasks": rows}
+```
+
+A custom tool runs the same way the built-in tools do. It runs as the signed in
+user, with Frappe permissions on, and every call is written to the Synapse Log.
+The app author is responsible for what the function does, so it should read and
+write through the normal Frappe document API and never with permissions off.
+
+A registered tool is not reachable on its own. Two more things must be true:
+
+1. **Enable Custom Tools** is ticked in Synapse Settings.
+2. A Synapse Profile the caller holds lists the tool by its exact name, in the
+   Custom Tools table.
+
+This is the same explicit grant model as the rest of Synapse. Full Access does
+not include custom tools, because a custom tool can run any code its app wrote,
+so each one is granted by name. A tool whose name clashes with a built-in is
+refused at load, so an app can never replace a core tool. The readiness report
+lists every registered tool and whether a profile grants it:
+
+```bash
+bench --site <your-site> execute synapse.mcp_tools.check.report
+```
+
 ## Model provider
 
 Synapse Settings has a **Model Provider** choice. Claude is the only provider

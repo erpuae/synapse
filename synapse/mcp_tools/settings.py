@@ -59,28 +59,31 @@ def _build() -> Policy:
 		if blocked:
 			denied[_norm(row.document_type)] = frozenset(blocked)
 
-	full_access, sql_access, grants, grant_names = _resolve_profiles()
+	full_access, sql_access, grants, grant_names, custom_tools = _resolve_profiles()
 
 	return Policy(
 		enabled=bool(doc.enabled),
 		read_enabled=bool(doc.enable_read_tools),
 		write_enabled=bool(doc.enable_write_tools),
 		sql_enabled=bool(doc.enable_sql_tool) and sql_access,
+		custom_enabled=bool(doc.get("enable_custom_tools")),
 		full_access=full_access,
 		grants=grants,
 		grant_names=grant_names,
 		denied=denied,
+		custom_tools=custom_tools,
 	)
 
 
 def _resolve_profiles() -> tuple:
 	"""Union the enabled profiles whose roles the current user holds.
 
-	Returns (full_access, sql_access, grants, grant_names). `grants` maps a
-	normalised DocType name to the set of actions granted across those profiles;
-	`grant_names` keeps a display spelling for each. Full Access short-circuits
-	the grid, the grants map is left empty because policy.granted_actions treats
-	full_access as "every action on every DocType".
+	Returns (full_access, sql_access, grants, grant_names, custom_tools).
+	`grants` maps a normalised DocType name to the set of actions granted across
+	those profiles; `grant_names` keeps a display spelling for each;
+	`custom_tools` is the set of custom tool names granted. Full Access
+	short-circuits the DocType grid, but SQL and custom tools are read before
+	that, so a Full Access profile can still list those extras explicitly.
 	"""
 
 	roles = set(frappe.get_roles(frappe.session.user))
@@ -89,6 +92,7 @@ def _resolve_profiles() -> tuple:
 	sql_access = False
 	grants: dict[str, set] = {}
 	grant_names: dict[str, str] = {}
+	custom_tools: set = set()
 
 	names = frappe.get_all(PROFILE_DOCTYPE, filters={"enabled": 1}, pluck="name")
 	for name in names:
@@ -100,6 +104,10 @@ def _resolve_profiles() -> tuple:
 
 		if profile.allow_sql:
 			sql_access = True
+
+		for row in profile.get("custom_tools") or []:
+			if row.tool:
+				custom_tools.add(row.tool.strip())
 
 		if profile.full_access:
 			full_access = True
@@ -118,7 +126,7 @@ def _resolve_profiles() -> tuple:
 			grant_names.setdefault(key, row.document_type)
 
 	frozen = {key: frozenset(actions) for key, actions in grants.items()}
-	return full_access, sql_access, frozen, grant_names
+	return full_access, sql_access, frozen, grant_names, frozenset(custom_tools)
 
 
 # ── predicates used as `enabled=` on tool registrations ───────────────────────
@@ -159,6 +167,18 @@ def operate_tools_enabled() -> bool:
 def sql_tool_enabled() -> bool:
 	policy = get_policy()
 	return policy.enabled and policy.sql_enabled
+
+
+def custom_tool_enabled(name: str) -> bool:
+	"""Whether one custom tool is reachable for the caller.
+
+	Needs the endpoint on, the site's Enable Custom Tools switch on, and the tool
+	named in a Synapse Profile the caller holds. Full Access does not grant custom
+	tools; they must be listed by name.
+	"""
+
+	policy = get_policy()
+	return policy.enabled and policy.custom_enabled and name in policy.custom_tools
 
 
 def _has_any_grant(policy: Policy) -> bool:

@@ -49,7 +49,14 @@ def handle_mcp():
 	This runs before every JSON-RPC call, `ping` and `initialize` included, and
 	importing the tool modules is what fills the registry. Anything heavier than
 	an import here is paid on every single call.
+
+	The built-in tools are imported first, then custom tools contributed by other
+	apps are wired in. Built-ins are registered before that, so a custom tool can
+	never take a built-in tool's name.
 	"""
 
 	import synapse.mcp_tools.documents  # noqa: F401
 	import synapse.mcp_tools.sql  # noqa: F401
+	from synapse import extend
+
+	extend.load_external_tools()

@@ -34,6 +34,7 @@ LOG_DOCTYPE = "Synapse Log"
 READ = "Read"
 WRITE = "Write"
 OPERATE = "Operate"
+CUSTOM = "Custom"
 SQL = "SQL"
 OTHER = "Other"
 

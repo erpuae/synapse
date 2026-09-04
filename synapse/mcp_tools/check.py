@@ -59,6 +59,7 @@ def report_text() -> str:
 	lines.append(f"  [{ok if s.enable_read_tools else no}] Read tools")
 	lines.append(f"  [{'  on  ' if s.enable_write_tools else ' off  '}] Write tools")
 	lines.append(f"  [{'  on  ' if s.enable_sql_tool else ' off  '}] Read-only SQL tool (also needs a profile with Allow SQL)")
+	lines.append(f"  [{'  on  ' if s.get('enable_custom_tools') else ' off  '}] Custom tools from other apps (also needs a profile to list each)")
 	lines.append(f"         Model provider: {settings.model_provider()}")
 	lines.append(f"         Row limit: {settings.row_limit()}   Retention: {settings.retention_days()} days")
 	lines.append("")
@@ -99,6 +100,27 @@ def report_text() -> str:
 			for row in sorted(access, key=lambda r: r.document_type or ""):
 				actions = [a for a in ACTIONS if row.get(f"allow_{a}")]
 				lines.append(f"           {row.document_type}: {', '.join(actions) or 'nothing ticked'}")
+	lines.append("")
+
+	# ── custom tools ──
+	lines.append("Custom tools (registered by other installed apps)")
+	try:
+		from synapse.extend import registered_tools
+
+		tools = registered_tools()
+	except Exception:
+		tools = {}
+
+	granted = {row.tool for p in profiles for row in frappe.get_doc("Synapse Profile", p.name).get("custom_tools") or [] if row.tool}
+	if not tools:
+		lines.append("         none registered. An app adds them with the synapse_tools hook.")
+	for name in sorted(tools):
+		ext = tools[name]
+		mark = "granted" if name in granted else "not granted by any profile"
+		lines.append(f"         {name}  (from {ext.app or '?'})  [{mark}]")
+	# Names a profile lists but no app provides, likely a typo.
+	for name in sorted(granted - set(tools)):
+		lines.append(f"         {name}  [listed in a profile but not registered by any app]")
 	lines.append("")
 
 	# ── read-only database user ──
