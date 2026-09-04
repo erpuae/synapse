@@ -1,20 +1,25 @@
 # Copyright (c) 2026, Dxbitz and contributors
 """Custom tools contributed by other apps.
 
-Any installed app can add its own tools to the Synapse endpoint. An app writes a
-plain function, marks it with the `@synapse.tool` decorator, and lists the module
-in its hooks:
+Any installed app can add its own tools to the Synapse endpoint through one hook,
+`synapse_tools`. Nothing else is wired by hand and the app needs no import of
+synapse. Declare each tool as a dict pointing at a plain function:
 
 	# in myapp/hooks.py
-	synapse_tools = ["myapp.synapse_tools"]
+	synapse_tools = [
+		{"method": "myapp.synapse_tools.open_tasks_for", "read_only": True},
+	]
 
 	# in myapp/synapse_tools.py
-	import synapse
+	import frappe
 
-	@synapse.tool(read_only=True)
 	def open_tasks_for(project: str) -> dict:
 		"A short description the model sees. Args come from the signature."
 		...
+
+An app that would rather keep the metadata next to the function can instead mark
+it with the `@synapse.tool` decorator and list the module path as a string in the
+same hook. Both forms may be mixed. See load_external_tools().
 
 The function runs the same way the built-in tools do. It runs as the signed in
 user, with Frappe permissions on, and every call is written to the Synapse Log.
@@ -94,15 +99,14 @@ def tool(
 
 
 def registered_tools() -> dict[str, ExternalTool]:
-	"""The custom tools imported so far. Import the hook modules first if empty."""
+	"""Every custom tool declared by an installed app, read from the hooks."""
 
-	if not _REGISTRY:
-		_import_tool_modules()
+	_collect_from_hooks()
 	return dict(_REGISTRY)
 
 
 def load_external_tools() -> None:
-	"""Import every app's tool modules and wire each new tool into the server.
+	"""Read the hooks and wire each new tool into the server.
 
 	Called from the endpoint on each request. It is cheap to repeat: module
 	imports are cached by Python, and a tool already on the server is skipped, so
@@ -114,7 +118,7 @@ def load_external_tools() -> None:
 	from synapse.mcp_core import ToolAnnotations
 	from synapse.mcp_tools import audit, settings
 
-	_import_tool_modules()
+	_collect_from_hooks()
 
 	for ext in list(_REGISTRY.values()):
 		if ext.name in mcp._tools:
@@ -129,16 +133,61 @@ def load_external_tools() -> None:
 		_wire(mcp, ToolAnnotations, audit, settings, ext)
 
 
-def _import_tool_modules() -> None:
+def _collect_from_hooks() -> None:
+	"""Fill the registry from every app's `synapse_tools` hook.
+
+	A hook entry is either a dict that declares a tool outright:
+
+		synapse_tools = [
+			{"method": "myapp.synapse_tools.open_tasks_for", "read_only": True},
+		]
+
+	which needs nothing from the app but a plain function, or a module path
+	string, which is imported so its `@synapse.tool` decorators run:
+
+		synapse_tools = ["myapp.synapse_tools"]
+
+	Both may be mixed. The dict form keeps the app free of any import of synapse.
+	"""
+
 	import importlib
 
 	import frappe
 
-	for path in frappe.get_hooks("synapse_tools") or []:
+	for entry in frappe.get_hooks("synapse_tools") or []:
 		try:
-			importlib.import_module(path)
+			if isinstance(entry, dict):
+				_register_from_dict(entry)
+			elif isinstance(entry, str):
+				importlib.import_module(entry)
 		except Exception:
-			_log(f"Could not import synapse_tools module '{path}'.")
+			_log(f"Could not load synapse_tools entry {entry!r}.")
+
+
+def _register_from_dict(entry: dict) -> None:
+	"""Register one tool declared as a hook dict, resolving its method path."""
+
+	import frappe
+
+	method = entry.get("method") or entry.get("tool")
+	if not method:
+		_log(f"synapse_tools entry has no 'method': {entry!r}.")
+		return
+
+	fn = frappe.get_attr(method)
+	if not callable(fn):
+		_log(f"synapse_tools method '{method}' is not callable.")
+		return
+
+	name = entry.get("name") or getattr(fn, "__name__", str(method).rsplit(".", 1)[-1])
+	_REGISTRY[name] = ExternalTool(
+		fn=fn,
+		name=name,
+		app=str(method).split(".", 1)[0] or None,
+		description=entry.get("description"),
+		read_only=bool(entry.get("read_only")),
+		destructive=bool(entry.get("destructive")),
+	)
 
 
 def _wire(mcp, ToolAnnotations, audit, settings, ext: ExternalTool) -> None:

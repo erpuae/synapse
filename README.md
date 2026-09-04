@@ -116,25 +116,26 @@ used to get around the other tools.
 
 Any installed app can add its own tools to the Synapse endpoint, so an app can
 expose the specific jobs it knows how to do rather than only the generic document
-tools. An app writes a function, marks it, and lists the module in its hooks:
+tools. It is all done through one hook. The app declares each tool as data and
+needs no import of synapse:
 
 ```python
 # in myapp/hooks.py
-synapse_tools = ["myapp.synapse_tools"]
+synapse_tools = [
+    {"method": "myapp.synapse_tools.open_tasks_for", "read_only": True},
+]
 ```
 
 ```python
 # in myapp/synapse_tools.py
-import synapse
+import frappe
 
-@synapse.tool(read_only=True)
 def open_tasks_for(project: str) -> dict:
     """Return the open tasks on a project.
 
     The description and arguments the model sees come from this docstring and
     the function signature.
     """
-    import frappe
     rows = frappe.get_list(
         "Task",
         filters={"project": project, "status": ["!=", "Completed"]},
@@ -142,6 +143,11 @@ def open_tasks_for(project: str) -> dict:
     )
     return {"project": project, "open_tasks": rows}
 ```
+
+An app that prefers to keep the flags next to the function can instead mark it
+with `@synapse.tool(read_only=True)` and list the module path as a plain string
+in the same hook (`synapse_tools = ["myapp.synapse_tools"]`). Both forms may be
+mixed.
 
 A custom tool runs the same way the built-in tools do. It runs as the signed in
 user, with Frappe permissions on, and every call is written to the Synapse Log.
