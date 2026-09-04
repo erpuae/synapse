@@ -5,9 +5,11 @@
 // page grid (M1) and the demo harness read the same registry.
 
 import { render, resolve, RENDERERS, known_types } from "./library/registry.js";
+import { renderPage } from "./library/grid.js";
 
 frappe.provide("synapse.library");
 synapse.library.render = render;
 synapse.library.resolve = resolve;
 synapse.library.renderers = RENDERERS;
 synapse.library.known_types = known_types;
+synapse.library.render_page = renderPage;

@@ -91,6 +91,31 @@
 .synapse-text-block p { margin: 0.4em 0; }
 .synapse-text-block code { background: var(--control-bg, var(--gray-100)); padding: 1px 4px; border-radius: 4px; }
 
+/* M1 page grid: a responsive 12-column layout. On a wide desk each block spans
+   its --span of 12; the grid collapses to 6 columns on a tablet and to a single
+   stacked column on a phone, so a page stays readable at any width. */
+.synapse-page-section { margin-bottom: 8px; }
+.synapse-page-grid {
+	display: grid;
+	grid-template-columns: repeat(12, minmax(0, 1fr));
+	gap: 12px;
+	align-items: start;
+}
+.synapse-page-block { grid-column: span var(--span, 12); min-width: 0; }
+.synapse-page-block-body { min-width: 0; }
+
+@media (max-width: 991px) {
+	/* Tablet: halve the grid to 6 columns. A block keeps its --span; the grid
+	   auto-clamps any span wider than 6 to full width, so nothing is hair-thin. */
+	.synapse-page-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+	/* Phone: one column, every block full width. */
+	.synapse-page-grid { grid-template-columns: 1fr; }
+	.synapse-page-block { grid-column: 1 / -1 !important; }
+}
+
 /* layout primitives */
 .synapse-section-break { border-top: 1px solid var(--border-color, var(--gray-200)); margin: 8px 0; padding-top: 8px; }
 .synapse-section-title { font-size: var(--text-sm, 12px); font-weight: 600; color: var(--text-color); }

@@ -1,0 +1,33 @@
+{
+ "actions": [],
+ "creation": "2026-09-04 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "component_type",
+  "columns",
+  "column_break_block",
+  "config",
+  "frozen_data"
+ ],
+ "fields": [
+  {"fieldname": "component_type", "fieldtype": "Link", "label": "Component", "options": "Synapse Component", "reqd": 1, "in_list_view": 1, "columns": 3, "description": "A catalog key, for example bar_chart, or a layout primitive."},
+  {"fieldname": "columns", "fieldtype": "Int", "label": "Columns", "default": "12", "in_list_view": 1, "columns": 1, "description": "Grid span, 1 to 12. Ignored by section_break and spacer, which are always full width."},
+  {"fieldname": "column_break_block", "fieldtype": "Column Break"},
+  {"fieldname": "config", "fieldtype": "Code", "label": "Config (JSON)", "options": "JSON", "description": "The component's options. Keys outside its options_schema are ignored at render."},
+  {"fieldname": "frozen_data", "fieldtype": "Code", "label": "Frozen Data (JSON)", "options": "JSON", "description": "The baked data the component renders. Must match the component's data_template. No data source in M1."}
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-04 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Synapse",
+ "name": "Synapse Page Block",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

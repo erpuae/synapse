@@ -76,6 +76,44 @@ def connect_context() -> dict:
 
 
 @frappe.whitelist()
+def get_page_layout(name: str) -> dict:
+	"""Return one Synapse Page as a render model for the grid.
+
+	Reads the page as the current user (get_doc enforces the read permission),
+	parses each block's config and frozen_data from JSON, and hands back the
+	shape synapse.library.render_page expects. This reads the page definition,
+	not any data source: the data is baked into each block.
+	"""
+
+	doc = frappe.get_doc("Synapse Page", name)
+	doc.check_permission("read")
+
+	blocks = []
+	for block in doc.get("blocks") or []:
+		blocks.append(
+			{
+				"component_type": block.component_type,
+				"columns": block.columns or 12,
+				"config": _loads(block.config),
+				"frozen_data": _loads(block.frozen_data),
+			}
+		)
+
+	return {"name": doc.name, "title": doc.title, "enabled": bool(doc.enabled), "blocks": blocks}
+
+
+def _loads(raw):
+	import json
+
+	if not raw:
+		return {}
+	try:
+		return json.loads(raw)
+	except Exception:
+		return {}
+
+
+@frappe.whitelist()
 def readiness_report() -> str:
 	"""The text of `check.report`, for the console's Health Check action.
 

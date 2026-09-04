@@ -1,0 +1,39 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:page_name",
+ "creation": "2026-09-04 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "page_name",
+  "enabled",
+  "intro_html",
+  "section_blocks",
+  "blocks"
+ ],
+ "fields": [
+  {"fieldname": "title", "fieldtype": "Data", "label": "Title", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "page_name", "fieldtype": "Data", "label": "Route Name", "reqd": 1, "unique": 1, "in_list_view": 1, "description": "The slug used in the route /app/synapse-page/<name>. Lowercase, no spaces."},
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "1"},
+  {"fieldname": "intro_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">Blocks are laid out in order on a 12-column grid. Each block spans its Columns; when a row fills, the next block wraps. Use section_break to start a section, column_break to force a new row, and spacer for vertical space. In M1 the data is baked into each block's Frozen Data; no data source is wired.</p>"},
+
+  {"fieldname": "section_blocks", "fieldtype": "Section Break", "label": "Blocks"},
+  {"fieldname": "blocks", "fieldtype": "Table", "label": "Blocks", "options": "Synapse Page Block"}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-04 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Synapse",
+ "name": "Synapse Page",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "print": 1, "email": 1, "share": 1, "report": 1, "export": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
