@@ -119,6 +119,8 @@ ALWAYS_READ_ONLY = frozenset(
 		"system settings",
 		"workflow",
 		"scheduled job type",
+		# Synapse's own read-layer catalog. Agents may read it, never rewrite it.
+		"synapse component",
 	}
 )
 

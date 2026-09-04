@@ -5,6 +5,11 @@ app_description = "A permission-aware MCP server for Frappe and ERPNext"
 app_email = "info@dxbitz.com"
 app_license = "agpl-3.0"
 
+# The component library (M0). The bundle exposes synapse.library on the desk; the
+# CSS styles the Group B widgets and placeholders from theme variables.
+app_include_js = ["synapse.bundle.js"]
+app_include_css = ["synapse_library.css"]
+
 # The MCP endpoint is served at:
 #     POST /api/method/synapse.mcp.handle_mcp
 # It is registered by the @mcp.register() decorator in synapse/mcp.py, which

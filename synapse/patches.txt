@@ -3,5 +3,7 @@
 
 [post_model_sync]
 # Patches executed after DocTypes are migrated.
-# Synapse creates no roles and no records of its own, access is granted by
-# Synapse Profile documents made in the desk, so there is nothing to seed here.
+# Synapse creates no roles. Access is granted by Synapse Profile documents made
+# in the desk. The one thing seeded is the read-layer component catalog, which is
+# app-owned and re-seeded idempotently from synapse/components/catalog.py.
+synapse.patches.seed_components

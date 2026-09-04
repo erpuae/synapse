@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:key",
+ "creation": "2026-09-04 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "key",
+  "label",
+  "component_group",
+  "column_break_head",
+  "is_layout",
+  "not_implemented",
+  "section_desc",
+  "description",
+  "note",
+  "section_contracts",
+  "data_template",
+  "options_schema"
+ ],
+ "fields": [
+  {"fieldname": "key", "fieldtype": "Data", "label": "Key", "reqd": 1, "unique": 1, "in_list_view": 1, "description": "The component_type the registry resolves, for example bar_chart."},
+  {"fieldname": "label", "fieldtype": "Data", "label": "Label", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "component_group", "fieldtype": "Select", "label": "Group", "options": "Chart\nWidget\nLayout", "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "column_break_head", "fieldtype": "Column Break"},
+  {"fieldname": "is_layout", "fieldtype": "Check", "label": "Is Layout", "default": "0", "in_list_view": 1, "description": "A layout primitive that carries no data."},
+  {"fieldname": "not_implemented", "fieldtype": "Check", "label": "Not Implemented", "default": "0", "in_list_view": 1, "description": "Seeded as a flagged stub. Its renderer draws a placeholder, not a faked look."},
+  {"fieldname": "section_desc", "fieldtype": "Section Break", "label": "Description"},
+  {"fieldname": "description", "fieldtype": "Small Text", "label": "Description", "description": "Written for an LLM to read: what the component shows and when to choose it."},
+  {"fieldname": "note", "fieldtype": "Small Text", "label": "Note"},
+  {"fieldname": "section_contracts", "fieldtype": "Section Break", "label": "Contracts"},
+  {"fieldname": "data_template", "fieldtype": "Code", "label": "Data Template (JSON Schema)", "options": "JSON", "description": "The shape the baked frozen_data must match. The author-time validator (M2) and the LLM (M4) both read this."},
+  {"fieldname": "options_schema", "fieldtype": "Code", "label": "Options Schema (JSON Schema)", "options": "JSON", "description": "The config keys the component accepts. Anything outside this is ignored, not passed through."}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-04 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Synapse",
+ "name": "Synapse Component",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "print": 1, "email": 1, "share": 1, "report": 1, "export": 1}
+ ],
+ "sort_field": "component_group",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 0
+}

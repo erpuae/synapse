@@ -1,0 +1,98 @@
+/* Copyright (c) 2026, Dxbitz and contributors
+   Styling for the Synapse component library. Every value is a Frappe theme
+   variable, so light and dark both come from one definition and the widgets sit
+   beside the desk's own without looking foreign. No component hardcodes a colour. */
+
+.synapse-component {
+	background: var(--card-bg, var(--fg-color, #fff));
+	border: 1px solid var(--border-color, var(--gray-200));
+	border-radius: var(--border-radius-md, 8px);
+	padding: 12px 14px;
+}
+.synapse-component-title {
+	font-size: var(--text-sm, 12px);
+	font-weight: 600;
+	color: var(--text-color);
+	margin-bottom: 10px;
+}
+
+/* placeholder */
+.synapse-placeholder {
+	border: 1px dashed var(--border-color, var(--gray-300));
+	border-radius: var(--border-radius-md, 8px);
+	padding: 20px;
+	text-align: center;
+	background: var(--control-bg, var(--gray-50));
+}
+.synapse-placeholder-title { color: var(--text-color); font-size: var(--text-sm, 12px); font-weight: 600; }
+.synapse-placeholder-sub { color: var(--text-muted, var(--gray-600)); font-size: var(--text-xs, 11px); margin-top: 4px; }
+
+/* number_card */
+.synapse-number-card {
+	background: var(--card-bg, var(--fg-color, #fff));
+	border: 1px solid var(--border-color, var(--gray-200));
+	border-radius: var(--border-radius-md, 8px);
+	padding: 16px 18px;
+}
+.synapse-number-label { color: var(--text-muted, var(--gray-600)); font-size: var(--text-sm, 12px); margin-bottom: 6px; }
+.synapse-number-value { color: var(--text-color); font-size: 26px; font-weight: 700; line-height: 1.1; }
+.synapse-number-delta { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm, 12px); margin-top: 8px; font-weight: 600; }
+.synapse-number-delta.trend-up { color: var(--green-600, #28a745); }
+.synapse-number-delta.trend-down { color: var(--red-600, #e24c4c); }
+.synapse-number-delta.trend-flat { color: var(--text-muted, var(--gray-600)); }
+
+/* table + pivot */
+.synapse-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm, 12px); }
+.synapse-table th {
+	text-align: left; color: var(--text-muted, var(--gray-600)); font-weight: 600;
+	padding: 6px 8px; border-bottom: 1px solid var(--border-color, var(--gray-200)); white-space: nowrap;
+}
+.synapse-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-color, var(--gray-100)); color: var(--text-color); }
+.synapse-table tr:last-child td { border-bottom: none; }
+.synapse-table .text-right { text-align: right; }
+.synapse-pivot-rowhead { color: var(--text-color); font-weight: 600; text-align: left; }
+.synapse-pivot-total { font-weight: 600; }
+
+/* list */
+.synapse-list { display: flex; flex-direction: column; }
+.synapse-list-row {
+	position: relative; display: flex; justify-content: space-between; align-items: center;
+	padding: 7px 8px; font-size: var(--text-sm, 12px); border-radius: var(--border-radius, 6px); overflow: hidden;
+}
+.synapse-list-bar {
+	position: absolute; left: 0; top: 0; bottom: 0; z-index: 0;
+	background: var(--blue-100, rgba(94, 100, 255, 0.12));
+	border-radius: var(--border-radius, 6px);
+}
+.synapse-list-label, .synapse-list-value { position: relative; z-index: 1; }
+.synapse-list-label { color: var(--text-color); }
+.synapse-list-value { color: var(--text-color); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* progress */
+.synapse-progress-head { display: flex; justify-content: space-between; font-size: var(--text-sm, 12px); margin-bottom: 6px; }
+.synapse-progress-label { color: var(--text-color); }
+.synapse-progress-figures { color: var(--text-muted, var(--gray-600)); font-variant-numeric: tabular-nums; }
+.synapse-progress-track { height: 8px; background: var(--control-bg, var(--gray-200)); border-radius: 999px; overflow: hidden; }
+.synapse-progress-fill { height: 100%; background: var(--blue-500, #5e64ff); border-radius: 999px; }
+.synapse-progress-percent { color: var(--text-muted, var(--gray-600)); font-size: var(--text-xs, 11px); margin-top: 4px; text-align: right; }
+
+/* callout */
+.synapse-callout { border-radius: var(--border-radius-md, 8px); padding: 12px 14px; border-left: 3px solid; }
+.synapse-callout-title { font-weight: 600; font-size: var(--text-sm, 12px); color: var(--text-color); margin-bottom: 3px; }
+.synapse-callout-body { font-size: var(--text-sm, 12px); color: var(--text-muted, var(--gray-700)); }
+.synapse-callout.level-info { background: var(--blue-50, #f0f4ff); border-left-color: var(--blue-500, #5e64ff); }
+.synapse-callout.level-success { background: var(--green-50, #f0fbf3); border-left-color: var(--green-500, #28a745); }
+.synapse-callout.level-warning { background: var(--yellow-50, #fff9e6); border-left-color: var(--yellow-500, #ffc107); }
+.synapse-callout.level-danger { background: var(--red-50, #fff0f0); border-left-color: var(--red-500, #e24c4c); }
+
+/* text_block */
+.synapse-text-block { font-size: var(--text-md, 13px); color: var(--text-color); line-height: 1.6; }
+.synapse-text-block h1, .synapse-text-block h2, .synapse-text-block h3 { color: var(--text-color); margin: 0.4em 0; }
+.synapse-text-block p { margin: 0.4em 0; }
+.synapse-text-block code { background: var(--control-bg, var(--gray-100)); padding: 1px 4px; border-radius: 4px; }
+
+/* layout primitives */
+.synapse-section-break { border-top: 1px solid var(--border-color, var(--gray-200)); margin: 8px 0; padding-top: 8px; }
+.synapse-section-title { font-size: var(--text-sm, 12px); font-weight: 600; color: var(--text-color); }
+.synapse-column-break { border-left: 1px dashed var(--border-color, var(--gray-300)); height: 100%; min-height: 12px; }
+.synapse-spacer { width: 100%; }
