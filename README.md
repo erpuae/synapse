@@ -80,7 +80,7 @@ something that a profile would otherwise allow.
 | `list_available_doctypes`, `describe_doctype` | read |
 | `get_doc`, `get_value`, `get_list`, `get_count` | read |
 | `create_doc`, `update_doc`, `set_value` | write |
-| `add_child`, `set_child_value`, `delete_child` | write |
+| `add_child`, `set_child_value`, `set_child_rows`, `delete_child` | write |
 | `replace_in_field` | write |
 | `submit_doc` | submit |
 | `cancel_doc` | cancel |
@@ -88,12 +88,30 @@ something that a profile would otherwise allow.
 | `run_operation` | operate |
 | `run_sql_query` | a profile with Allow SQL (see below) |
 
-The child table tools edit one row of a table in place. Without them,
-`update_doc` replaces the whole table, so you would have to send every row back
-to change one. `replace_in_field` edits part of a long text field. It counts how
-many times the text you want to change appears, and it refuses unless that count
-matches the number you expected, so it cannot rewrite the wrong part by mistake.
-`run_operation` runs a document's own method (see below).
+The write tools fall into three bands, all under the `write` action:
+
+- **Document level:** `create_doc` makes a document, `update_doc` changes fields
+  on one (and replaces a whole child table if pointed at one), `set_value` sets a
+  single field.
+- **Row level:** `add_child` appends a row and returns its name and idx,
+  `set_child_value` edits one row (one or more fields, optional `expect`),
+  `set_child_rows` edits many rows atomically, `delete_child` removes a row. Rows
+  are addressed by `row.name`, taken from a prior `get_doc`, never by position or
+  content, so the log always names the row it touched. Each runs the parent's
+  real save, so totals and tax recompute the same as in the desk.
+- **Field text:** `replace_in_field` changes part of a long text field. It counts
+  how many times the text appears and refuses unless that count matches the number
+  you expected, so it cannot rewrite the wrong part.
+
+**For a child table, prefer the row-level tools.** Use `update_doc` on a table
+only to replace the whole thing on purpose. Reaching for `update_doc` to change
+one price would silently discard every other row.
+
+`set_child_value`, `set_child_rows` and `delete_child` take an optional `expect`
+of current values. When given, the write is refused if the row no longer holds
+those values, so an edit cannot land on a row that changed since it was read. A
+submitted parent is refused, the same as a desk edit would be. `run_operation`
+runs a document's own method (see below).
 
 Dates come back in the format set in Synapse Settings, ISO by default. Writes
 accept ISO or DD-MM-YYYY, so a read then write round trip cannot swap the day and

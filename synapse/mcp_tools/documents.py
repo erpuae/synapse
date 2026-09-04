@@ -396,10 +396,15 @@ def update_doc(doctype: str, name: str, values: dict):
 	Only the fields given are touched. The before and after values of each are
 	written to the Synapse Log.
 
+	For a child table, prefer the row-level tools (set_child_value, set_child_rows,
+	add_child, delete_child). A child table given here replaces the whole table, so
+	use update_doc on a table only when you mean to rebuild it. To change one row,
+	set_child_value edits that row and leaves the others alone.
+
 	Args:
 		doctype: The DocType to update.
 		name: The document name.
-		values: Field values to set. Child tables given here replace the whole
+		values: Field values to set. A child table given here replaces the whole
 			table, so send every row you want to keep.
 	"""
 
@@ -531,43 +536,45 @@ def delete_doc(doctype: str, name: str):
 	return {"name": name, "doctype": doctype, "deleted": True}
 
 
-# ── child tables ──────────────────────────────────────────────────────────────
-# update_doc replaces a whole child table, which means resending every row to
-# change one. These three edit a table in place: cheaper on tokens, and they do
-# not silently drop rows the caller forgot to echo back.
+# ── child tables (row level) ──────────────────────────────────────────────────
+# For a child table, prefer these over update_doc. update_doc on a table replaces
+# the whole table, so it is for rebuilding a table on purpose, not for changing
+# one row. These edit a table in place, addressed by row.name, which the caller
+# takes from a prior get_doc. There is no content matching, so the log always
+# names the row it touched. Every edit runs the parent's real save once, so
+# totals, tax and any table hook recompute the same as they would in the desk.
+# A submitted parent is refused, exactly as a desk edit would be.
 @mcp.tool(
 	annotations=ToolAnnotations(title="Add a child row", readOnlyHint=False, destructiveHint=False),
 	enabled=settings.write_tools_enabled,
 )
 @audit.audited(audit.WRITE)
-def add_child(doctype: str, name: str, table_field: str, values: dict):
+def add_child(parent_doctype: str, parent_name: str, child_field: str, values: dict):
 	"""Append one row to a child table and save the parent.
 
+	Returns the new row's name and idx, so a following set_child_value can target
+	it without re-reading the whole document.
+
 	Args:
-		doctype: The parent DocType, for example "Sales Invoice".
-		name: The parent document name.
-		table_field: The child-table fieldname on the parent, for example "items".
+		parent_doctype: The parent DocType, for example "Sales Order".
+		parent_name: The parent document name.
+		child_field: The child-table fieldname on the parent, for example "items".
 		values: Field values for the new row.
 	"""
 
-	doctype = _gate(WRITE, doctype)
-	audit.current().target(doctype, name)
+	doctype, doc, child_doctype = _open_parent_for_child(parent_doctype, parent_name, child_field)
 
-	child_doctype = _child_doctype(doctype, table_field)
 	secret_keys = _secret_fieldnames(child_doctype)
-	audit.current().sent({table_field: [values]}, secret_keys)
+	audit.current().sent({"child_field": child_field, "values": values}, secret_keys)
 
-	doc = frappe.get_doc(doctype, name)
-	doc.check_permission("write")
-
-	row = doc.append(table_field, _prepare(child_doctype, values, child=True))
+	row = doc.append(child_field, _prepare(child_doctype, values, child=True))
 	doc.save()
 
 	audit.current().rows(1)
 	return {
-		"name": doc.name,
-		"doctype": doctype,
-		"table_field": table_field,
+		"parent_doctype": doctype,
+		"parent_name": doc.name,
+		"child_field": child_field,
 		"row_name": row.name,
 		"idx": row.idx,
 	}
@@ -575,7 +582,7 @@ def add_child(doctype: str, name: str, table_field: str, values: dict):
 
 @mcp.tool(
 	annotations=ToolAnnotations(
-		title="Set a child row field",
+		title="Set fields on a child row",
 		readOnlyHint=False,
 		destructiveHint=True,
 		idempotentHint=True,
@@ -583,42 +590,74 @@ def add_child(doctype: str, name: str, table_field: str, values: dict):
 	enabled=settings.write_tools_enabled,
 )
 @audit.audited(audit.WRITE)
-def set_child_value(doctype: str, name: str, table_field: str, row: str, field: str, value=None):
-	"""Set one field on one existing child row and save the parent.
+def set_child_value(
+	parent_doctype: str,
+	parent_name: str,
+	child_field: str,
+	row_name: str,
+	changes: dict,
+	expect: dict | None = None,
+):
+	"""Set one or more fields on one existing child row and save the parent.
+
+	One logical edit in one call. For a price correction that also touches a
+	dependent field, put both in `changes` so it is a single save.
 
 	Args:
-		doctype: The parent DocType.
-		name: The parent document name.
-		table_field: The child-table fieldname on the parent, for example "items".
-		row: Which row, its row name, or its 1-based position (idx) as shown by
-			get_doc.
-		field: The child field to set.
-		value: The new value. Dates may be YYYY-MM-DD or DD-MM-YYYY.
+		parent_doctype: The parent DocType, for example "Sales Order".
+		parent_name: The parent document name.
+		child_field: The child-table fieldname on the parent, for example "items".
+		row_name: The row's name, taken from a prior get_doc.
+		changes: Field to value, for example {"rate": 250, "discount_percentage": 0}.
+			Must not be empty. Dates may be YYYY-MM-DD or DD-MM-YYYY.
+		expect: Optional. Field to expected current value, for example {"rate": 200}.
+			The write is refused if the row does not currently hold those values, so
+			an edit cannot land on a row that changed since it was read.
 	"""
 
-	doctype = _gate(WRITE, doctype)
-	audit.current().target(doctype, name)
+	doctype, applied = _apply_row_edits(
+		parent_doctype, parent_name, child_field,
+		[{"row_name": row_name, "changes": changes, "expect": expect}],
+	)
+	name_out, fields = applied[0]
+	return {
+		"parent_doctype": doctype,
+		"parent_name": parent_name,
+		"child_field": child_field,
+		"row_name": name_out,
+		"updated_fields": fields,
+	}
 
-	child_doctype = _child_doctype(doctype, table_field)
-	if field in PROTECTED_FIELDS:
-		raise Denied(f"'{field}' is managed by the framework and cannot be set here.")
 
-	doc = frappe.get_doc(doctype, name)
-	doc.check_permission("write")
+@mcp.tool(
+	annotations=ToolAnnotations(title="Set fields on many child rows", readOnlyHint=False, destructiveHint=True),
+	enabled=settings.write_tools_enabled,
+)
+@audit.audited(audit.WRITE)
+def set_child_rows(parent_doctype: str, parent_name: str, child_field: str, edits: list):
+	"""Edit several child rows at once, all or nothing, in one save.
 
-	child = _find_child(doc, table_field, row)
-	prepared = _prepare(child_doctype, {field: value}, child=True)
-	if field not in prepared:
-		raise Denied(f"'{field}' cannot be set on {child_doctype}.")
+	Every edit is checked first. If any one fails, the whole call is refused and
+	nothing is saved. Only when all pass are they applied, then the parent is
+	saved once and one log row records every before and after. This is the tool
+	for a large table, where one row per call would be many calls and many saves.
 
-	secret_keys = _secret_fieldnames(child_doctype)
-	before = _out(child.get(field))
-	child.set(field, prepared[field])
-	doc.save()
+	Args:
+		parent_doctype: The parent DocType.
+		parent_name: The parent document name.
+		child_field: The child-table fieldname on the parent, for example "items".
+		edits: A list of edits, each {"row_name": ..., "changes": {...}} with an
+			optional "expect": {...} of current values to assert before the change.
+	"""
 
-	audit.current().changed({f"{table_field}[{child.idx}].{field}": {"from": before, "to": _out(child.get(field))}}, secret_keys)
-	audit.current().rows(1)
-	return {"name": doc.name, "doctype": doctype, "table_field": table_field, "row_name": child.name, "field": field}
+	doctype, applied = _apply_row_edits(parent_doctype, parent_name, child_field, edits)
+	return {
+		"parent_doctype": doctype,
+		"parent_name": parent_name,
+		"child_field": child_field,
+		"row_count": len(applied),
+		"rows": [{"row_name": rn, "updated_fields": fields} for rn, fields in applied],
+	}
 
 
 @mcp.tool(
@@ -626,33 +665,34 @@ def set_child_value(doctype: str, name: str, table_field: str, row: str, field: 
 	enabled=settings.write_tools_enabled,
 )
 @audit.audited(audit.WRITE)
-def delete_child(doctype: str, name: str, table_field: str, row: str):
+def delete_child(parent_doctype: str, parent_name: str, child_field: str, row_name: str, expect: dict | None = None):
 	"""Remove one row from a child table and save the parent.
 
 	Args:
-		doctype: The parent DocType.
-		name: The parent document name.
-		table_field: The child-table fieldname on the parent.
-		row: Which row, its row name, or its 1-based position (idx).
+		parent_doctype: The parent DocType.
+		parent_name: The parent document name.
+		child_field: The child-table fieldname on the parent.
+		row_name: The row's name, taken from a prior get_doc.
+		expect: Optional. Field to expected current value, asserted before the row
+			is removed, so a delete cannot hit a row that shifted since it was read.
 	"""
 
-	doctype = _gate(WRITE, doctype)
-	audit.current().target(doctype, name)
+	doctype, doc, child_doctype = _open_parent_for_child(parent_doctype, parent_name, child_field)
 
-	child_doctype = _child_doctype(doctype, table_field)
+	row = _locate_row(doc, child_field, row_name)
+	_check_expect(row, child_field, expect)
 
-	doc = frappe.get_doc(doctype, name)
-	doc.check_permission("write")
-
-	child = _find_child(doc, table_field, row)
 	# The snapshot is the only trace left once the row is gone.
-	audit.current().sent({f"{table_field}[{child.idx}]": child.as_dict()}, _secret_fieldnames(child_doctype))
+	audit.current().sent(
+		{"child_field": child_field, "row_name": row.name, "expect": expect, "removed": row.as_dict()},
+		_secret_fieldnames(child_doctype),
+	)
 
-	doc.remove(child)
+	doc.remove(row)
 	doc.save()
 
 	audit.current().rows(1)
-	return {"name": doc.name, "doctype": doctype, "table_field": table_field, "deleted_row": row}
+	return {"parent_doctype": doctype, "parent_name": parent_name, "child_field": child_field, "deleted_row": row.name}
 
 
 # ── careful text replace ──────────────────────────────────────────────────────
@@ -835,23 +875,163 @@ def _child_doctype(doctype: str, table_field: str) -> str:
 	return df.options
 
 
-def _find_child(doc, table_field: str, row: str):
-	"""Locate one child row by its row name, then by 1-based idx. Raises Denied."""
+def _open_parent_for_child(parent_doctype: str, parent_name: str, child_field: str):
+	"""Gate and load a parent for a child-table write. Raises Denied.
 
-	rows = doc.get(table_field) or []
-	wanted = str(row).strip()
+	Runs the write gate on the parent, checks the caller's write permission,
+	confirms the child field is a real table, and refuses a submitted or cancelled
+	parent, the same as a desk edit would. Returns (resolved doctype, doc, child
+	DocType).
+	"""
 
-	for r in rows:
+	doctype = _gate(WRITE, parent_doctype)
+	audit.current().target(doctype, parent_name)
+
+	child_doctype = _child_doctype(doctype, child_field)
+
+	doc = frappe.get_doc(doctype, parent_name)
+	doc.check_permission("write")
+
+	if doc.docstatus == 1:
+		raise Denied(
+			"The parent document is submitted, so its rows cannot be edited. Reopen it "
+			"with cancel and amend if the change is intended."
+		)
+	if doc.docstatus == 2:
+		raise Denied("The parent document is cancelled and cannot be edited.")
+
+	return doctype, doc, child_doctype
+
+
+def _locate_row(doc, child_field: str, row_name: str):
+	"""Locate one child row by its name only. Raises Denied if absent."""
+
+	if not row_name or not isinstance(row_name, str):
+		raise Denied("A row_name is required.")
+
+	wanted = row_name.strip()
+	for r in doc.get(child_field) or []:
 		if r.name and str(r.name) == wanted:
 			return r
 
-	if wanted.isdigit():
-		idx = int(wanted)
-		for r in rows:
-			if r.idx == idx:
-				return r
+	raise Denied(
+		f"No row named '{row_name}' in {child_field}. Read the document with get_doc to "
+		"get the row name, rows are addressed by name, not by position or content."
+	)
 
-	raise Denied(f"No row '{row}' in {table_field}. Give the row name or its idx from get_doc.")
+
+def _check_expect(row, child_field: str, expect) -> None:
+	"""Refuse if any expected value does not match the row's current value."""
+
+	if expect is None:
+		return
+	if not isinstance(expect, dict):
+		raise Denied("'expect' must be an object of field name to expected value.")
+
+	for field, expected in expect.items():
+		current = _out(row.get(field))
+		if not _values_match(current, expected):
+			raise Denied(
+				f"Stale expect on {child_field} row {row.name}: '{field}' is {current!r}, "
+				f"not the expected {expected!r}. Re-read the document and try again."
+			)
+
+
+def _values_match(current, expected) -> bool:
+	"""Compare a serialised current value to an expected one, numbers loosely."""
+
+	numeric = (int, float)
+	if (
+		isinstance(current, numeric)
+		and isinstance(expected, numeric)
+		and not isinstance(current, bool)
+		and not isinstance(expected, bool)
+	):
+		return float(current) == float(expected)
+	return current == expected
+
+
+def _prepare_child_changes(child_doctype: str, changes) -> dict:
+	"""Validate a changes dict for a child row and convert its dates.
+
+	Non-empty, every key a real field on the child, none of them a framework-owned
+	field. Raises Denied naming the first problem.
+	"""
+
+	if not isinstance(changes, dict) or not changes:
+		raise Denied("'changes' must be a non-empty object of field name to value.")
+
+	meta = frappe.get_meta(child_doctype)
+	known = {df.fieldname for df in meta.fields}
+
+	prepared = {}
+	for key, value in changes.items():
+		if key in PROTECTED_FIELDS:
+			raise Denied(f"'{key}' is managed by the framework and cannot be set on a child row.")
+		if key not in known:
+			raise Denied(
+				f"'{key}' is not a field on {child_doctype}. Use describe_doctype on the child "
+				"table to see its fields."
+			)
+
+		df = meta.get_field(key)
+		if df and df.fieldtype in ("Date", "Datetime"):
+			value = serialise.to_db_date(value)
+		prepared[key] = value
+
+	return prepared
+
+
+def _apply_row_edits(parent_doctype: str, parent_name: str, child_field: str, edits):
+	"""The one code path behind set_child_value and set_child_rows.
+
+	Validate every edit first: the row exists, expect matches, and each changed
+	field is real and not protected. If any edit fails, nothing is saved. Only
+	when all pass are they applied in memory, the parent saved once, and one log
+	row written covering every changed row. Returns (resolved doctype, list of
+	(row_name, changed_field_names)).
+	"""
+
+	if not isinstance(edits, list) or not edits:
+		raise Denied("Give at least one edit.")
+
+	doctype, doc, child_doctype = _open_parent_for_child(parent_doctype, parent_name, child_field)
+	secret_keys = _secret_fieldnames(child_doctype)
+
+	# Validate all before touching anything.
+	plan = []
+	asked = []
+	for i, edit in enumerate(edits):
+		if not isinstance(edit, dict):
+			raise Denied(f"Edit {i} must be an object with 'row_name' and 'changes'.")
+
+		row = _locate_row(doc, child_field, edit.get("row_name"))
+		_check_expect(row, child_field, edit.get("expect"))
+		prepared = _prepare_child_changes(child_doctype, edit.get("changes"))
+
+		plan.append((row, prepared))
+		asked.append(
+			{"row_name": row.name, "changes": edit.get("changes"), "expect": edit.get("expect")}
+		)
+
+	# Record what was asked, so the log shows which edits asserted their state.
+	audit.current().sent({"child_field": child_field, "edits": asked}, secret_keys)
+
+	# Apply, then one save.
+	applied = []
+	changed = {}
+	for row, prepared in plan:
+		for field, value in prepared.items():
+			before = _out(row.get(field))
+			row.set(field, value)
+			changed[f"{child_field}[{row.name}].{field}"] = {"from": before, "to": _out(row.get(field))}
+		applied.append((row.name, sorted(prepared)))
+
+	doc.save()
+
+	audit.current().changed(changed, secret_keys)
+	audit.current().rows(len(applied))
+	return doctype, applied
 
 
 def _gate(action: str, doctype: str) -> str:

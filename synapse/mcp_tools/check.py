@@ -62,6 +62,7 @@ def report_text() -> str:
 	lines.append(f"  [{'  on  ' if s.get('enable_custom_tools') else ' off  '}] Custom tools from other apps (also needs a profile to list each)")
 	lines.append(f"         Model provider: {settings.model_provider()}")
 	lines.append(f"         Row limit: {settings.row_limit()}   Retention: {settings.retention_days()} days")
+	lines.append("         Row tools present: add_child, set_child_value, set_child_rows, delete_child (write)")
 	lines.append("")
 
 	# ── the backstop ──
