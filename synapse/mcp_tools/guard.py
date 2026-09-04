@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Dxbitz and contributors
 """Read-only validation for SQL submitted through the MCP endpoint.
 
-No frappe import, no I/O, no side effects — so every rule can be unit tested
+No frappe import, no I/O, no side effects, so every rule can be unit tested
 without booting a site (the one sibling import, policy.ALWAYS_DENIED, is itself
 pure stdlib). See tests/test_mcp_guard.py.
 
@@ -81,7 +81,7 @@ BLOCKED_KEYWORDS = (
 
 # Case-insensitive substring match. Tables holding secrets, tokens or anything
 # that would let a reader escalate. Derived from policy.ALWAYS_DENIED so the SQL
-# tool and the document tools block exactly the same set and cannot drift — a
+# tool and the document tools block exactly the same set and cannot drift, a
 # DocType named there as "oauth client" becomes the table "taboauth client".
 # `__auth` is a framework table, not a DocType, so it is added explicitly.
 # Extend per site with the site_config key `mcp_sql_blocked_tables` rather than
@@ -102,7 +102,7 @@ _ALLOWED_STATEMENTS = ("select", "with")
 class UnsafeQuery(Exception):
 	"""Raised when a submitted query fails one of the read-only rules.
 
-	The message names the rule that fired — the caller hands it straight back to
+	The message names the rule that fired, the caller hands it straight back to
 	the model, which needs enough to correct itself on the next attempt.
 	"""
 
@@ -122,7 +122,7 @@ def validate_read_only(query: str, extra_blocked_tables: tuple | list | None = N
 	if not stripped:
 		raise UnsafeQuery("Rule 'empty': query is empty.")
 
-	# 1. Length cap — checked first so a pathological string is cheap to refuse.
+	# 1. Length cap, checked first so a pathological string is cheap to refuse.
 	if len(stripped) > MAX_QUERY_LENGTH:
 		raise UnsafeQuery(
 			f"Rule 'length': query is {len(stripped)} characters, "
@@ -134,7 +134,7 @@ def validate_read_only(query: str, extra_blocked_tables: tuple | list | None = N
 		if marker in stripped:
 			raise UnsafeQuery(
 				f"Rule 'comment': query contains '{marker}'. "
-				"Comments are not allowed — resubmit without them."
+				"Comments are not allowed, resubmit without them."
 			)
 
 	# 3. A single statement only. One trailing semicolon is tolerated.

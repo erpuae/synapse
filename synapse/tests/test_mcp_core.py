@@ -1,6 +1,6 @@
 """Tests for the vendored MCP core and value conversion.
 
-Pure stdlib — mcp_core.schema and mcp_tools.serialise import nothing from
+Pure stdlib, mcp_core.schema and mcp_tools.serialise import nothing from
 frappe. These cover the two things a vendored library has to keep working: the
 tool schemas a client is shown, and the argument checking that stands in front
 of every tool body.

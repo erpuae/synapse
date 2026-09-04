@@ -42,7 +42,7 @@
 
   {"fieldname": "section_access", "fieldtype": "Section Break", "label": "Access"},
   {"fieldname": "access_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">Access is granted by <b>Synapse Profile</b> records, not here. A user's reach is the union of every enabled profile whose roles they hold. With no profile, nothing is reachable. The list below is a site-wide <b>backstop</b>: it blocks actions no agent may take whatever a profile grants.</p>"},
-  {"fieldname": "denylist_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">Token and credential DocTypes are always blocked, and schema, code and permission DocTypes (DocType, Custom Field, Server Script, Custom DocPerm, Role, User …) are always read only, whether or not they appear below. Add a row only to block something a profile would otherwise allow.</p>"},
+  {"fieldname": "denylist_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">Token and credential DocTypes are always blocked, and schema, code and permission DocTypes (DocType, Custom Field, Server Script, Custom DocPerm, Role, User ...) are always read only, whether or not they appear below. Add a row only to block something a profile would otherwise allow.</p>"},
   {"fieldname": "denied_doctypes", "fieldtype": "Table", "label": "Blocked DocTypes (backstop)", "options": "Synapse Denied DocType"},
 
   {"fieldname": "section_log", "fieldtype": "Section Break", "label": "Audit Log"},

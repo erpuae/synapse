@@ -19,7 +19,7 @@ under Frappe permissions, and is logged.
 
 Deliberately not exposed:
 
-* `frappe.db.set_value` — skips validation and hooks. `set_value` here loads the
+* `frappe.db.set_value`, skips validation and hooks. `set_value` here loads the
   document and saves it, so a scripted field stays correct.
 * Rename and amend. Add them when a real case turns up, with their own flags.
 """
@@ -334,7 +334,7 @@ def get_count(doctype: str, filters: dict | None = None):
 		limit_page_length=0,
 	)
 
-	# The returned key is the rendered SQL — "COUNT(`name`)" — so read the value
+	# The returned key is the rendered SQL, "COUNT(`name`)", so read the value
 	# rather than guessing the key. frappe 16 refuses an aggregate written as a
 	# plain string in `fields`, hence the dict form.
 	total = int(next(iter((rows[0] or {}).values()), 0) or 0) if rows else 0
@@ -383,7 +383,7 @@ def create_doc(doctype: str, values: dict):
 		# Destructive: it overwrites existing values, and a child table given
 		# here replaces the whole table. Clients use this hint to decide how
 		# firmly to confirm, and an update deserves at least the care of a
-		# delete. idempotentHint is deliberately absent — repeating an update
+		# delete. idempotentHint is deliberately absent, repeating an update
 		# whose payload contains a child table is not a no-op.
 		destructiveHint=True,
 	),
@@ -590,7 +590,7 @@ def set_child_value(doctype: str, name: str, table_field: str, row: str, field: 
 		doctype: The parent DocType.
 		name: The parent document name.
 		table_field: The child-table fieldname on the parent, for example "items".
-		row: Which row — its row name, or its 1-based position (idx) as shown by
+		row: Which row, its row name, or its 1-based position (idx) as shown by
 			get_doc.
 		field: The child field to set.
 		value: The new value. Dates may be YYYY-MM-DD or DD-MM-YYYY.
@@ -633,7 +633,7 @@ def delete_child(doctype: str, name: str, table_field: str, row: str):
 		doctype: The parent DocType.
 		name: The parent document name.
 		table_field: The child-table fieldname on the parent.
-		row: Which row — its row name, or its 1-based position (idx).
+		row: Which row, its row name, or its 1-based position (idx).
 	"""
 
 	doctype = _gate(WRITE, doctype)
@@ -660,7 +660,7 @@ def delete_child(doctype: str, name: str, table_field: str, row: str):
 	annotations=ToolAnnotations(
 		title="Replace text in a field",
 		readOnlyHint=False,
-		# Overwrites part of a field. Not idempotent — running it again replaces
+		# Overwrites part of a field. Not idempotent, running it again replaces
 		# a different span, or none, so the count guard below is the safety.
 		destructiveHint=True,
 	),
@@ -677,7 +677,7 @@ def replace_in_field(doctype: str, name: str, field: str, find: str, replace: st
 	drifted out of the text fails loudly instead of doing nothing.
 
 	Set `expect_count` to the number of occurrences you actually intend to
-	replace — check first with get_doc if unsure. Refuses an empty `find`, and a
+	replace, check first with get_doc if unsure. Refuses an empty `find`, and a
 	no-op where `find` equals `replace`.
 
 	Args:
@@ -697,7 +697,7 @@ def replace_in_field(doctype: str, name: str, field: str, find: str, replace: st
 	if not isinstance(replace, str):
 		raise Denied("'replace' must be a string.")
 	if find == replace:
-		raise Denied("'find' and 'replace' are identical — nothing to do.")
+		raise Denied("'find' and 'replace' are identical, nothing to do.")
 
 	meta = frappe.get_meta(doctype)
 	df = meta.get_field(field)
@@ -733,7 +733,7 @@ def replace_in_field(doctype: str, name: str, field: str, find: str, replace: st
 
 # ── custom operation runner ───────────────────────────────────────────────────
 # The one tool that runs a document's own code. Its `operate` action is granted
-# per DocType in a Synapse Profile — that grant is the allowlist that makes this
+# per DocType in a Synapse Profile, that grant is the allowlist that makes this
 # safe to expose. Framework mutators that have their own gated tools are blocked
 # so operate can never be a side door around submit, delete and the rest.
 BLOCKED_OPERATIONS = frozenset(
@@ -763,14 +763,14 @@ BLOCKED_OPERATIONS = frozenset(
 def run_operation(doctype: str, name: str, operation: str, args: dict | None = None, save: bool = False):
 	"""Call one of a document's own methods, for actions the field tools cannot do.
 
-	Some documents carry behaviour beyond their fields — a Sales Invoice can
+	Some documents carry behaviour beyond their fields, a Sales Invoice can
 	repost its accounting entries, a Stock Entry can recalculate valuation. This
 	runs such a method through the framework's own dispatcher, so its hooks fire
 	as they would from a desk button. It runs as you, under your permissions.
 
 	The method must be granted: this needs the `operate` action on the DocType in
 	one of your Synapse profiles. Methods that have their own dedicated tool
-	(save, submit, cancel, delete …) are refused here, and so is anything
+	(save, submit, cancel, delete ...) are refused here, and so is anything
 	private. Most operations save themselves; pass save=true only for one that
 	changes the document in memory and leaves saving to the caller.
 
@@ -891,8 +891,8 @@ def _meta(doctype: str):
 def _prepare(doctype: str, values, child: bool = False) -> dict:
 	"""Reject framework-owned fields, then convert dates for the database.
 
-	On the parent a framework-owned field (docstatus, name, …) is an error worth
-	surfacing — the caller is trying to do something the tool deliberately does
+	On the parent a framework-owned field (docstatus, name, ...) is an error worth
+	surfacing, the caller is trying to do something the tool deliberately does
 	not. On a **child row** those same fields are what a read-modify-write cycle
 	echoes back verbatim (get_doc returns child `name`, `parent`, `idx`), so
 	there they are stripped rather than fatal. Child tables are replaced whole,
@@ -958,7 +958,7 @@ def _document_dict(doc) -> dict:
 	  one that must apply it by hand, or it becomes the endpoint that leaks
 	  salary, cost and margin fields a get_list would have dropped.
 	* **Password fieldtype.** Stored in `__Auth`, never in the column, so
-	  as_dict only ever holds the `*****` dummy — but strip them anyway so not
+	  as_dict only ever holds the `*****` dummy, but strip them anyway so not
 	  even the length leaks.
 	"""
 

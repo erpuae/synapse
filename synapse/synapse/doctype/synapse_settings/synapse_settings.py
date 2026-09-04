@@ -1,5 +1,5 @@
 # Copyright (c) 2026, Dxbitz and contributors
-"""Synapse Settings — the site-wide switches and the backstop denylist.
+"""Synapse Settings, the site-wide switches and the backstop denylist.
 
 Access is not granted here. It is granted by Synapse Profile records, whose
 roles decide who gets what; this page only holds the master switches, the row

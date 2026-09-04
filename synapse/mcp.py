@@ -6,7 +6,7 @@
 Authentication is Frappe's own, so an OAuth2 bearer token, an API key or a desk
 session cookie all work. Frappe 16 publishes OAuth server metadata and supports
 dynamic client registration, which is what lets an MCP client connect without an
-OAuth Client record being made by hand — see the README for the three OAuth
+OAuth Client record being made by hand, see the README for the three OAuth
 Settings switches that has to be turned on.
 
 `allow_guest` is left at False, so an unauthenticated POST is refused by the

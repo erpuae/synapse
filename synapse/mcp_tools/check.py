@@ -29,7 +29,7 @@ OAUTH_FLAGS = (
 def report():
 	"""Print the readiness report. Called from `bench execute`."""
 
-	# Printed, not returned — `bench execute` echoes a return value, which would
+	# Printed, not returned, `bench execute` echoes a return value, which would
 	# dump the whole report a second time as one escaped string.
 	print(report_text())
 
@@ -65,7 +65,7 @@ def report_text() -> str:
 
 	# ── the backstop ──
 	denied = [row for row in s.get("denied_doctypes") or [] if row.document_type]
-	lines.append(f"Backstop — Blocked DocTypes ({len(denied)} entries)")
+	lines.append(f"Backstop, Blocked DocTypes ({len(denied)} entries)")
 	for row in sorted(denied, key=lambda r: r.document_type or ""):
 		blocked = [a for a in ACTIONS if row.get(f"deny_{a}")]
 		lines.append(f"         {row.document_type}: blocks {', '.join(blocked) or 'nothing ticked'}")
@@ -79,7 +79,7 @@ def report_text() -> str:
 	lines.append(f"Synapse Profiles ({len(enabled_profiles)} enabled of {len(profiles)})")
 	if not enabled_profiles:
 		lines.append(
-			"  [" + no + "] No enabled profile — every document tool will refuse. "
+			"  [" + no + "] No enabled profile, every document tool will refuse. "
 			"Create a Synapse Profile, add roles and DocType access."
 		)
 	for p in profiles:
@@ -93,7 +93,7 @@ def report_text() -> str:
 			flags.append("SQL")
 		flag_str = f"  [{', '.join(flags)}]" if flags else ""
 		lines.append(f"         {p.name} ({state}){flag_str}")
-		lines.append(f"           roles: {', '.join(sorted(roles)) or 'none — grants nobody anything'}")
+		lines.append(f"           roles: {', '.join(sorted(roles)) or 'none, grants nobody anything'}")
 		if not p.full_access:
 			access = doc.get("doctype_access") or []
 			for row in sorted(access, key=lambda r: r.document_type or ""):

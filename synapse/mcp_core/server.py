@@ -11,7 +11,7 @@ declares the roles allowed to call it:
 	def get_doc(...): ...
 
 A user who does not hold one of them never sees the tool in `tools/list` and is
-refused by `tools/call`. Hiding it matters as much as refusing it — a listed
+refused by `tools/call`. Hiding it matters as much as refusing it, a listed
 tool the model cannot call becomes a retry loop.
 """
 
@@ -43,7 +43,7 @@ SUPPORTED_PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 
 @dataclass
 class ToolAnnotations:
-	"""Client-facing hints. `readOnlyHint` is the one that matters here — some
+	"""Client-facing hints. `readOnlyHint` is the one that matters here, some
 	clients auto-approve a read-only tool and prompt for anything else."""
 
 	title: str | None = None
@@ -86,7 +86,7 @@ class MCP:
 			name: Server name reported to clients at `initialize`.
 			version: Server version reported at `initialize`.
 			on_refusal: Called as (tool_name, reason, tool_or_None) when a call
-				is turned away before the tool body runs — unknown tool, missing
+				is turned away before the tool body runs, unknown tool, missing
 				role, bad arguments. The app uses it to keep those attempts in
 				its audit trail; without it they would leave no trace, which is
 				the opposite of what an audit trail is for.
@@ -103,7 +103,7 @@ class MCP:
 		"""Wrap a function as the whitelisted Frappe endpoint for this server.
 
 		The decorated function runs before each request, which is where tool
-		modules get imported. Keep its body to imports — it runs on every
+		modules get imported. Keep its body to imports, it runs on every
 		JSON-RPC call including `ping`.
 		"""
 
@@ -145,7 +145,7 @@ class MCP:
 			description: Overrides the docstring summary.
 			roles: Roles allowed to call it. Any one is enough. Empty means any
 				authenticated user, which for this app is almost never right.
-			annotations: Client hints — set readOnlyHint on read tools.
+			annotations: Client hints, set readOnlyHint on read tools.
 			enabled: Optional predicate evaluated per request. Returning False
 				hides the tool, which is how site settings switch groups of
 				tools off without unregistering them.

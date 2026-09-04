@@ -16,7 +16,7 @@ hundreds of grid rows, so this fills one profile's grid in a single command:
 		--kwargs "{'profile': 'Reporting'}"
 
 For "reach everything, let Frappe permissions be the limit", tick Full Access on
-the profile instead — it says that in one box rather than 700 rows, and it stays
+the profile instead, it says that in one box rather than 700 rows, and it stays
 correct as the schema grows. grant_all is for the middle ground: a broad but
 enumerated grid you can then trim.
 
@@ -68,7 +68,7 @@ def show(profile=None):
 def grant_all(profile=None, actions="read", include_singles=1, dry_run=0):
 	"""List every DocType on the site in the profile, with the given actions.
 
-	Child tables are skipped — they are reached through their parent document.
+	Child tables are skipped, they are reached through their parent document.
 	Submit and cancel are only ticked where the DocType is actually submittable.
 
 	Args:
@@ -132,13 +132,13 @@ def grant(profile=None, doctypes=None, actions="read", dry_run=0):
 			frappe.throw(f"'{name}' is not a DocType on this site.")
 
 		if _norm(name) in NEVER:
-			print(f"  skipped {name} — never reachable through Synapse")
+			print(f"  skipped {name}, never reachable through Synapse")
 			continue
 
 		granted = set(wanted)
 		if _norm(name) in READ_ONLY_ALWAYS:
 			granted &= {"read"}
-			print(f"  {name} — read only, whatever was asked for")
+			print(f"  {name}, read only, whatever was asked for")
 
 		if granted:
 			rows.append((name, granted))
@@ -175,7 +175,7 @@ def _apply(doc, rows, dry_run, label: str, merge: bool = False):
 		for name, granted in rows[:15]:
 			print(f"  {name}: {', '.join(sorted(granted))}")
 		if len(rows) > 15:
-			print(f"  … and {len(rows) - 15} more")
+			print(f"  ... and {len(rows) - 15} more")
 		return
 
 	if not merge:

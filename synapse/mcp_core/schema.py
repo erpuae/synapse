@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Dxbitz and contributors
 """Tool input schemas, docstring parsing and argument validation.
 
-Pure stdlib — no frappe, no pydantic, no jsonschema — so it is unit testable
+Pure stdlib, no frappe, no pydantic, no jsonschema, so it is unit testable
 without a site and costs nothing to import. Adapted from frappe/frappe-mcp (MIT).
 
 Three jobs:
@@ -10,7 +10,7 @@ Three jobs:
 2. `split_docstring` pulls the summary and the per-argument descriptions out of
    a Google-style docstring so the model sees documented parameters.
 3. `validate_arguments` checks an incoming `tools/call` payload against the
-   schema. Deliberately shallow — types, required keys and unknown keys. Deep
+   schema. Deliberately shallow, types, required keys and unknown keys. Deep
    validation belongs in the tool, which has to be defensive anyway.
 """
 
@@ -110,8 +110,8 @@ def _to_json_schema(py_type: Any) -> dict:
 			return {"type": "object", "additionalProperties": _to_json_schema(args[1])}
 		return {"type": "object"}
 
-	# Anything else — a DocType class, a TypedDict, a forward ref that would not
-	# resolve — is described as "no constraint" rather than guessed at.
+	# Anything else, a DocType class, a TypedDict, a forward ref that would not
+	# resolve, is described as "no constraint" rather than guessed at.
 	return {}
 
 

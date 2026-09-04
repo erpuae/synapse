@@ -23,8 +23,8 @@
   {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "1", "in_list_view": 1, "description": "A disabled profile grants nothing, without deleting it."},
   {"fieldname": "column_break_head", "fieldtype": "Column Break"},
   {"fieldname": "full_access", "fieldtype": "Check", "label": "Full Access", "default": "0", "in_list_view": 1, "description": "Grants every action on every DocType, ignoring the grid below. The user's own Frappe permissions and the site backstop still apply. Assign only to a user whose Frappe permissions are already the limit you want."},
-  {"fieldname": "allow_sql", "fieldtype": "Check", "label": "Allow SQL", "default": "0", "in_list_view": 1, "description": "Lets the raw read-only SQL tool be used. That tool ignores DocType permissions entirely — grant only to users who already have full database access. Also needs the SQL switch in Synapse Settings."},
-  {"fieldname": "intro_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">A user's reach through Synapse is the <b>union</b> of every enabled profile whose roles they hold. Ticks here are a ceiling, not a grant — the user still needs the matching Frappe permission on each record.</p>"},
+  {"fieldname": "allow_sql", "fieldtype": "Check", "label": "Allow SQL", "default": "0", "in_list_view": 1, "description": "Lets the raw read-only SQL tool be used. That tool ignores DocType permissions entirely, grant only to users who already have full database access. Also needs the SQL switch in Synapse Settings."},
+  {"fieldname": "intro_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">A user's reach through Synapse is the <b>union</b> of every enabled profile whose roles they hold. Ticks here are a ceiling, not a grant, the user still needs the matching Frappe permission on each record.</p>"},
 
   {"fieldname": "section_roles", "fieldtype": "Section Break", "label": "Roles"},
   {"fieldname": "roles", "fieldtype": "Table", "label": "Roles", "options": "Synapse Profile Role", "description": "A user holding any of these roles is covered by this profile."},

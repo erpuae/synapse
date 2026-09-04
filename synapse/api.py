@@ -54,7 +54,7 @@ def user_is_covered(user: str | None = None) -> bool:
 
 # ── apps-screen gates ─────────────────────────────────────────────────────────
 def has_admin_permission() -> bool:
-	"""Gate for the Synapse tile on the /apps screen — System Manager only."""
+	"""Gate for the Synapse tile on the /apps screen, System Manager only."""
 
 	return ADMIN_ROLE in frappe.get_roles()
 
@@ -79,7 +79,7 @@ def connect_context() -> dict:
 def readiness_report() -> str:
 	"""The text of `check.report`, for the console's Health Check action.
 
-	System Manager only — it reveals the site's whole Synapse configuration.
+	System Manager only, it reveals the site's whole Synapse configuration.
 	"""
 
 	frappe.only_for(ADMIN_ROLE)

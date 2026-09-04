@@ -1,5 +1,5 @@
 # Copyright (c) 2026, Dxbitz and contributors
-"""Synapse Profile — a named bundle of access granted to a set of roles.
+"""Synapse Profile, a named bundle of access granted to a set of roles.
 
 This is the primary grant. A user's reach through the Synapse endpoint is the
 union of every enabled profile whose roles they hold: the DocType Access grid of

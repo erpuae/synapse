@@ -3,7 +3,7 @@
 
 The Policy is user-scoped: a call's reach is the union of every enabled Synapse
 Profile whose roles the calling user holds. That is resolved here, once, and
-cached on frappe.local for the life of the request — a request is one user, so
+cached on frappe.local for the life of the request, a request is one user, so
 the cache is safe, and it saves rebuilding the union on every tool call in a
 multi-call request.
 """
@@ -79,7 +79,7 @@ def _resolve_profiles() -> tuple:
 	Returns (full_access, sql_access, grants, grant_names). `grants` maps a
 	normalised DocType name to the set of actions granted across those profiles;
 	`grant_names` keeps a display spelling for each. Full Access short-circuits
-	the grid — the grants map is left empty because policy.granted_actions treats
+	the grid, the grants map is left empty because policy.granted_actions treats
 	full_access as "every action on every DocType".
 	"""
 
@@ -141,7 +141,7 @@ def write_tools_enabled() -> bool:
 def operate_tools_enabled() -> bool:
 	"""run_operation is visible only when the caller holds an 'operate' grant.
 
-	It shares the write master switch — operate is a write-class action — but it
+	It shares the write master switch, operate is a write-class action, but it
 	is hidden from callers with no operate grant so the powerful tool never even
 	appears for a user who could not use it.
 	"""
@@ -197,7 +197,7 @@ def output_formats() -> Formats:
 
 
 def model_provider() -> str:
-	"""The model family the site presents Synapse for. Showcase only — no behaviour."""
+	"""The model family the site presents Synapse for. Showcase only, no behaviour."""
 
 	return _value("model_provider") or "Claude"
 

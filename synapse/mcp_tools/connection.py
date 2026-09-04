@@ -13,7 +13,7 @@ Set up per site, credentials in site_config.json (never in the repo):
 	}
 
 If those keys are absent the tool falls back to frappe.db.sql with a rollback,
-and guard.py becomes the only boundary. That is a materially weaker posture —
+and guard.py becomes the only boundary. That is a materially weaker posture -
 see the SQL section of the app README.
 """
 

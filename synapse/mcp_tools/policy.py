@@ -1,21 +1,21 @@
 # Copyright (c) 2026, Dxbitz and contributors
 """The Synapse access model: which DocTypes may be touched, and how.
 
-Pure stdlib — no frappe import, no I/O — so every rule is unit testable without
+Pure stdlib, no frappe import, no I/O, so every rule is unit testable without
 a site. settings.py builds a Policy from the calling user's Synapse Profiles and
 the site's Synapse Settings, and hands it here. See tests/test_mcp_policy.py.
 
 Access is granted by **Synapse Profile** records. A user's reach is the union of
-every enabled profile whose roles they hold — each profile's DocType Access
+every enabled profile whose roles they hold, each profile's DocType Access
 grid, or everything if the profile has Full Access. That union is precomputed
 per request into Policy.grants (and Policy.full_access), so the check here needs
 no roles: it is a lookup against the grant the user already resolved to.
 
 This is one of three gates a call passes through:
 
-1. The endpoint is authenticated (OAuth bearer, API key or session) — an
+1. The endpoint is authenticated (OAuth bearer, API key or session), an
    unauthenticated POST is refused by the framework before any tool runs.
-2. **This module** — the action is granted for the DocType by the caller's
+2. **This module**, the action is granted for the DocType by the caller's
    profiles, and is not taken back by the site backstop below.
 3. Frappe's own permission check, because every tool operates as the session
    user with permissions on. DocType permissions, User Permissions, share rules
@@ -23,12 +23,12 @@ This is one of three gates a call passes through:
 
 The backstop is subtractive and always wins over a profile grant:
 
-* **Blocked DocTypes** listed in Synapse Settings — carve-outs no agent may
+* **Blocked DocTypes** listed in Synapse Settings, carve-outs no agent may
   touch whatever its profiles allow.
-* **ALWAYS_DENIED** — never reachable, for any action, listed or not. Tokens,
+* **ALWAYS_DENIED**, never reachable, for any action, listed or not. Tokens,
   credentials and the plumbing that hands them out, plus Synapse's own control
   plane, so an agent can never rewrite the gate that governs it.
-* **ALWAYS_READ_ONLY** — readable but never writable. Writing to these is
+* **ALWAYS_READ_ONLY**, readable but never writable. Writing to these is
   changing the schema, the code or the permission model, not entering data.
 """
 
@@ -67,7 +67,7 @@ ACTIONS = (READ, WRITE, SUBMIT, CANCEL, DELETE, OPERATE)
 WRITE_ACTIONS = (WRITE, SUBMIT, CANCEL, DELETE, OPERATE)
 
 # Never reachable, for any action, listed or not. Tokens, credentials and the
-# plumbing that hands them out — reading these is how a reader becomes a writer —
+# plumbing that hands them out, reading these is how a reader becomes a writer -
 # plus Synapse's own control plane, so an agent can never rewrite the gate that
 # governs it. guard.BLOCKED_TABLES is derived from this set (see guard.py) so the
 # raw SQL tool blocks the same tables and the two can never drift. Compared case
@@ -97,7 +97,7 @@ ALWAYS_DENIED = frozenset(
 )
 
 # Readable but never writable. Writing to these is not data entry, it is changing
-# the schema, the code or the permission model — and an agent that can edit
+# the schema, the code or the permission model, and an agent that can edit
 # Custom DocPerm can grant itself anything.
 ALWAYS_READ_ONLY = frozenset(
 	{
@@ -137,7 +137,7 @@ class Policy:
 	`grants` and `full_access` are the union across the caller's enabled Synapse
 	Profiles; `denied` is the site backstop. Keys in `grants` and `denied` are
 	normalised (stripped, lower-cased); matching here is case insensitive
-	throughout — a grant that only matched exact capitalisation would be bypassed
+	throughout, a grant that only matched exact capitalisation would be bypassed
 	by asking for 'salary slip'.
 	"""
 
@@ -199,7 +199,7 @@ def check(policy: Policy, action: str, doctype: str) -> str:
 	if not doctype or not isinstance(doctype, str):
 		raise Denied("A DocType is required.")
 
-	# Backstop first — it overrides any profile grant.
+	# Backstop first, it overrides any profile grant.
 	if action in policy.blocked_actions(doctype):
 		raise Denied(
 			f"'{doctype}' is blocked for '{action}' by this site's Synapse backstop."

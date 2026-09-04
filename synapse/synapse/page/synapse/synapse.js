@@ -52,7 +52,7 @@ class SynapseConsole {
 	}
 
 	render_loading() {
-		this.page.main.html(`<div class="text-muted" style="padding:40px;">${__("Loading…")}</div>`);
+		this.page.main.html(`<div class="text-muted" style="padding:40px;">${__("Loading...")}</div>`);
 	}
 
 	render() {

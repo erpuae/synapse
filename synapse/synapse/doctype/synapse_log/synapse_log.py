@@ -1,5 +1,5 @@
 # Copyright (c) 2026, Dxbitz and contributors
-"""Audit trail for the Synapse endpoint — one row per call, read or write.
+"""Audit trail for the Synapse endpoint, one row per call, read or write.
 
 Rows are written by synapse.mcp_tools.audit with db_insert and their own
 commit, so a rejected or rolled back call still leaves its record. Nothing here

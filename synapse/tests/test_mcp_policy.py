@@ -1,13 +1,13 @@
 """Rules test for the Synapse access model.
 
-Pure stdlib — policy.py imports nothing from frappe, so this runs under plain
+Pure stdlib, policy.py imports nothing from frappe, so this runs under plain
 pytest as well as `bench run-tests --app synapse`. If a case here starts
 failing, a gate got looser, not the test.
 
 The model: access is the union of the caller's Synapse Profiles, resolved by
 settings.py into Policy.grants (a DocType → actions map) and Policy.full_access.
-The site backstop — Policy.denied plus the built-in ALWAYS_DENIED and
-ALWAYS_READ_ONLY sets — is subtractive and overrides any grant.
+The site backstop, Policy.denied plus the built-in ALWAYS_DENIED and
+ALWAYS_READ_ONLY sets, is subtractive and overrides any grant.
 """
 
 import unittest
@@ -31,7 +31,7 @@ ALL_ACTIONS = (READ, WRITE, SUBMIT, CANCEL, DELETE, OPERATE)
 def policy(**overrides) -> Policy:
 	"""A working policy, so each test can loosen exactly one thing.
 
-	Task is granted everything, Sales Invoice read only — the union a caller's
+	Task is granted everything, Sales Invoice read only, the union a caller's
 	profiles would have resolved to.
 	"""
 
@@ -150,7 +150,7 @@ class TestBackstop(unittest.TestCase):
 			self.assertIn("backstop", str(ctx.exception).lower())
 
 	def test_denied_cannot_be_bypassed_with_capitalisation(self):
-		"""The bypass that would matter. Not a convenience — a requirement."""
+		"""The bypass that would matter. Not a convenience, a requirement."""
 
 		p = full(denied={"salary slip": frozenset(ALL_ACTIONS)})
 		for spelling in ("salary slip", "SALARY SLIP", "  Salary Slip  ", "sAlArY sLiP"):

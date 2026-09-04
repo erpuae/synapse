@@ -1,5 +1,5 @@
 # Copyright (c) 2026, Dxbitz and contributors
-"""The Synapse Log — one row for every call, read or write, allowed or not.
+"""The Synapse Log, one row for every call, read or write, allowed or not.
 
 Every tool is wrapped in @audited. The wrapper owns four things the tools should
 not each reimplement:
@@ -11,7 +11,7 @@ not each reimplement:
 * **The transaction.** A failed write is rolled back before anything else, so a
   half-applied document never survives. A successful one is committed together
   with its log row.
-* **The record.** Written with db_insert rather than a full insert() — no
+* **The record.** Written with db_insert rather than a full insert(), no
   validation, no hooks, no link checks. This runs on every call including
   rejections, so it has to be cheap.
 * **Redaction.** Password-ish keys never reach the log.
@@ -81,7 +81,7 @@ class Entry:
 		A query carries literal values in its WHERE clause, so it is a payload in
 		the same sense the write tools' values are. When a site turns payload
 		logging off it does so to keep data values out of the log, and the SQL
-		text has to obey that too — the row still records who ran SQL, when, the
+		text has to obey that too, the row still records who ran SQL, when, the
 		status and the row count.
 		"""
 		from synapse.mcp_tools import settings
@@ -129,7 +129,7 @@ def audited(kind: str, tool: str | None = None):
 			except Denied as e:
 				return _fail(entry, "Rejected", str(e))
 			except frappe.PermissionError as e:
-				# Gate 4 — Frappe itself refused. Reported like any other
+				# Gate 4, Frappe itself refused. Reported like any other
 				# rejection so the model does not retry it as a transient error.
 				# Document.raise_no_permission_to raises an *empty*
 				# PermissionError and leaves the detail in flags.error_message,
@@ -252,13 +252,13 @@ def _json(value, secret_keys=None) -> str | None:
 		text = str(value)
 
 	if len(text) > MAX_JSON_CHARS:
-		text = text[:MAX_JSON_CHARS] + "\n… truncated"
+		text = text[:MAX_JSON_CHARS] + "\n... truncated"
 
 	return text
 
 
 def redact(value, secret_keys=frozenset()):
-	"""Recursively blank anything whose key looks like — or is — a credential.
+	"""Recursively blank anything whose key looks like, or is, a credential.
 
 	A key is masked if it matches the credential-name pattern, or if it is one of
 	`secret_keys` (the caller's Password-fieldtype field names). The second path

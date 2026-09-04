@@ -30,7 +30,7 @@
   {"fieldname": "kind", "fieldtype": "Select", "label": "Kind", "options": "Read\nWrite\nOperate\nSQL\nOther", "read_only": 1, "in_list_view": 1, "in_standard_filter": 1},
   {"fieldname": "column_break_head", "fieldtype": "Column Break"},
   {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Success\nRejected\nError", "read_only": 1, "in_list_view": 1, "in_standard_filter": 1},
-  {"fieldname": "reference_doctype", "fieldtype": "Data", "label": "DocType", "read_only": 1, "in_standard_filter": 1, "description": "Data, not a Link, on purpose — an audit row must never block deletion of what it records."},
+  {"fieldname": "reference_doctype", "fieldtype": "Data", "label": "DocType", "read_only": 1, "in_standard_filter": 1, "description": "Data, not a Link, on purpose, an audit row must never block deletion of what it records."},
   {"fieldname": "reference_name", "fieldtype": "Data", "label": "Document", "read_only": 1, "in_list_view": 1},
   {"fieldname": "section_result", "fieldtype": "Section Break", "label": "Result"},
   {"fieldname": "row_count", "fieldtype": "Int", "label": "Rows", "read_only": 1},

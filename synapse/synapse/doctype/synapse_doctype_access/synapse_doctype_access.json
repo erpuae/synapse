@@ -20,7 +20,7 @@
   {"fieldname": "allow_submit", "fieldtype": "Check", "label": "Submit", "default": "0", "in_list_view": 1, "columns": 1},
   {"fieldname": "allow_cancel", "fieldtype": "Check", "label": "Cancel", "default": "0", "in_list_view": 1, "columns": 1},
   {"fieldname": "allow_delete", "fieldtype": "Check", "label": "Delete", "default": "0", "in_list_view": 1, "columns": 1},
-  {"fieldname": "allow_operate", "fieldtype": "Check", "label": "Operate", "default": "0", "in_list_view": 1, "columns": 1, "description": "Run the document's own methods through run_operation. Powerful — grant per DocType only where a method genuinely needs calling."}
+  {"fieldname": "allow_operate", "fieldtype": "Check", "label": "Operate", "default": "0", "in_list_view": 1, "columns": 1, "description": "Run the document's own methods through run_operation. Powerful, grant per DocType only where a method genuinely needs calling."}
  ],
  "index_web_pages_for_search": 0,
  "istable": 1,

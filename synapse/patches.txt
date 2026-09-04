@@ -3,5 +3,5 @@
 
 [post_model_sync]
 # Patches executed after DocTypes are migrated.
-# Synapse creates no roles and no records of its own — access is granted by
-# Synapse Profile documents made in the desk — so there is nothing to seed here.
+# Synapse creates no roles and no records of its own, access is granted by
+# Synapse Profile documents made in the desk, so there is nothing to seed here.

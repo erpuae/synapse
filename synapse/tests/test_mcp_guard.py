@@ -1,6 +1,6 @@
 """Rules test for the MCP read-only SQL guard.
 
-Pure stdlib — guard.py imports nothing from frappe, so this runs under plain
+Pure stdlib, guard.py imports nothing from frappe, so this runs under plain
 pytest as well as `bench run-tests --app synapse`. If a case here starts
 failing, the guard got looser, not the test.
 """
@@ -22,12 +22,12 @@ REJECTED = [
 	("session variable", "SET SESSION max_statement_time = 1"),
 	("token table", "SELECT * FROM `tabOAuth Bearer Token`"),
 	("token table, mixed case", "select name from `taboauth authorization code`"),
-	# Derived from policy.ALWAYS_DENIED — these used to slip through the SQL tool.
+	# Derived from policy.ALWAYS_DENIED, these used to slip through the SQL tool.
 	("oauth client secret", "SELECT client_id, client_secret FROM `tabOAuth Client`"),
 	("user social login", "SELECT * FROM `tabUser Social Login`"),
 	("control plane", "SELECT * FROM `tabSynapse Settings`"),
 	("audit trail", "SELECT * FROM `tabSynapse Log`"),
-	# Named-lock timing functions — underscore defeats the bare `lock` boundary.
+	# Named-lock timing functions, underscore defeats the bare `lock` boundary.
 	("get_lock", "SELECT GET_LOCK('x', 10)"),
 	("release_lock", "SELECT RELEASE_LOCK('x')"),
 	("is_free_lock", "SELECT IS_FREE_LOCK('x')"),

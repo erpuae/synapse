@@ -6,7 +6,7 @@ Why this exists rather than `pip install frappe-mcp`:
 * frappe-mcp 0.1.0 declares `pydantic~=2.11.7`, `werkzeug==3.1.3` and
   `click~=8.2.0`. Frappe 16 pins pydantic 2.12.5. Declaring the dependency makes
   `bench install-app`, `bench setup requirements` and `bench update` unsafe on
-  any bench carrying this app. Vendoring removes that hazard — synapse
+  any bench carrying this app. Vendoring removes that hazard, synapse
   installs with plain `bench install-app` and nothing else.
 * Upstream has no per-tool authorization. Its `@mcp.tool` signature carries a
   `role` argument that is commented out. We need it, so it is implemented here:
@@ -19,7 +19,7 @@ Why this exists rather than `pip install frappe-mcp`:
 Derived from frappe/frappe-mcp (MIT), trimmed to the parts this app uses:
 JSON-RPC over a single Streamable HTTP POST, `initialize`, `ping`,
 `tools/list`, `tools/call` and the notification sink. Prompts, resources,
-completion and SSE streaming are not implemented — they return METHOD_NOT_FOUND
+completion and SSE streaming are not implemented, they return METHOD_NOT_FOUND
 rather than pretending.
 """
 

@@ -2,7 +2,7 @@
 # For licence information, please see LICENSE
 """Value conversion between the database and MCP clients.
 
-Pure stdlib, no frappe — unit testable, and cheap enough to run over every cell
+Pure stdlib, no frappe, unit testable, and cheap enough to run over every cell
 of every result. Two directions:
 
 * **Out.** date, datetime, timedelta, Decimal and bytes are not JSON safe. The

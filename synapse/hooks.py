@@ -27,7 +27,7 @@ add_to_apps_screen = [
 ]
 
 # The user-facing shortcut rides on the User form (a user's own profile), shown
-# only when one of their roles is carried by a Synapse Profile — see
+# only when one of their roles is carried by a Synapse Profile, see
 # public/js/synapse_user.js.
 doctype_js = {
 	"User": "public/js/synapse_user.js",

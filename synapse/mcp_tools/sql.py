@@ -1,9 +1,9 @@
 # Copyright (c) 2026, Dxbitz and contributors
-"""The read-only SQL tool — the escape hatch, not the front door.
+"""The read-only SQL tool, the escape hatch, not the front door.
 
 Raw SQL bypasses Frappe's permission system completely, so this tool is not
 part of the document toolset and does not share the profile grants. It is gated
-on its own switch — `Allow SQL` on a Synapse Profile the caller holds — and it
+on its own switch, `Allow SQL` on a Synapse Profile the caller holds, and it
 is off until `enable_sql_tool` is ticked in Synapse Settings as well. Grant it
 only to someone who already has direct database access.
 
@@ -42,7 +42,7 @@ def run_sql_query(query: str, limit: int | None = None):
 	"""Run a read-only SQL SELECT query against the ERPNext/Frappe database.
 
 	Use this for joins, aggregates, GROUP BY, subqueries and cross-DocType
-	reconciliations — questions that span tables or summarise rows, which the
+	reconciliations, questions that span tables or summarise rows, which the
 	structured read tools cannot express. Returns the result rows.
 
 	Only SELECT and WITH statements are permitted. Table names follow the Frappe
@@ -58,7 +58,7 @@ def run_sql_query(query: str, limit: int | None = None):
 
 	Comments and multiple statements are rejected outright rather than cleaned
 	up. A blocked keyword is matched on word boundaries against the whole query,
-	so an identifier containing one is refused too — `tabCall Log` trips the
+	so an identifier containing one is refused too, `tabCall Log` trips the
 	`call` keyword, for instance. Dates come back in the format this site has
 	configured for Synapse, ISO by default.
 
@@ -142,7 +142,7 @@ def _check_frappe_layer(query: str):
 	"""Run Frappe's own read-only check as an extra layer, where it applies.
 
 	frappe.utils.safe_exec.check_safe_sql_query only whitelists SELECT and
-	EXPLAIN — it does not understand CTEs, so a valid WITH query fails it. Our
+	EXPLAIN, it does not understand CTEs, so a valid WITH query fails it. Our
 	own guard is strictly stricter on WITH statements, so the upstream check is
 	skipped there rather than being allowed to reject good queries.
 	"""
