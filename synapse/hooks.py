@@ -50,3 +50,23 @@ scheduler_events = {
 		"synapse.synapse.doctype.synapse_log.synapse_log.delete_old_logs",
 	],
 }
+
+# OAuth discovery for MCP clients on Frappe v15. v16 serves these itself (OAuth
+# Settings), so the routes are only added on v15 and never shadow Frappe's own.
+# The (/.*)? suffix also catches the path-suffixed forms some clients try first,
+# e.g. /.well-known/oauth-protected-resource/api/method/synapse.mcp.handle_mcp.
+from synapse.compat import native_oauth_discovery as _native_oauth_discovery
+
+if not _native_oauth_discovery():
+	website_redirects = [
+		{
+			"source": r"/.well-known/oauth-authorization-server(/.*)?",
+			"target": "/api/method/synapse.oauth_compat.authorization_server_metadata",
+			"redirect_http_status": 307,
+		},
+		{
+			"source": r"/.well-known/oauth-protected-resource(/.*)?",
+			"target": "/api/method/synapse.oauth_compat.protected_resource_metadata",
+			"redirect_http_status": 307,
+		},
+	]
