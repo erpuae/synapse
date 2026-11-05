@@ -26,6 +26,47 @@ OAUTH_FLAGS = (
 )
 
 
+def _oauth_lines(ok: str, no: str) -> list[str]:
+	"""The OAuth part of the report, for whichever Frappe version is running.
+
+	v16 serves the discovery itself, switched in OAuth Settings. v15 has no
+	OAuth Settings at all, Synapse serves the discovery (synapse.oauth_compat),
+	and registration is switched in Synapse Settings.
+	"""
+
+	from synapse.compat import frappe_major_version, native_oauth_discovery
+
+	lines = []
+	if native_oauth_discovery():
+		if not frappe.db.exists("DocType", "OAuth Settings"):
+			return [f"  [{no}] Frappe v{frappe_major_version()} but no OAuth Settings DocType. Run bench migrate."]
+		for fieldname, label in OAUTH_FLAGS:
+			on = bool(frappe.db.get_single_value("OAuth Settings", fieldname))
+			lines.append(f"  [{ok if on else no}] {label}")
+		lines.append("            Turn these on in OAuth Settings. Nothing in this app changes them.")
+		return lines
+
+	lines.append(f"         Frappe v{frappe_major_version()}: no OAuth Settings, Synapse serves the discovery itself.")
+	redirects = {r.get("source") for r in frappe.get_hooks("website_redirects") or []}
+	for path, label in (
+		("oauth-authorization-server", "OAuth server metadata (/.well-known/oauth-authorization-server)"),
+		("oauth-protected-resource", "Protected resource metadata (/.well-known/oauth-protected-resource)"),
+	):
+		wired = any(path in (src or "") for src in redirects)
+		lines.append(f"  [{ok if wired else no}] {label}")
+	try:
+		dcr = bool(frappe.db.get_single_value("Synapse Settings", "allow_client_registration"))
+	except Exception:
+		dcr = False
+	lines.append(f"  [{ok if dcr else no}] Dynamic client registration")
+	if not dcr:
+		lines.append(
+			"            Tick Allow Dynamic Client Registration in Synapse Settings, or give the "
+			"client a hand-made OAuth Client ID."
+		)
+	return lines
+
+
 def report():
 	"""Print the readiness report. Called from `bench execute`."""
 
@@ -46,10 +87,7 @@ def report_text() -> str:
 
 	# ── OAuth ──
 	lines.append("OAuth (needed for an MCP client to connect without a hand-made OAuth Client)")
-	for fieldname, label in OAUTH_FLAGS:
-		on = bool(frappe.db.get_single_value("OAuth Settings", fieldname))
-		lines.append(f"  [{ok if on else no}] {label}")
-	lines.append("            Turn these on in OAuth Settings. Nothing in this app changes them.")
+	lines.extend(_oauth_lines(ok, no))
 	lines.append("")
 
 	# ── settings ──

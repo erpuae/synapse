@@ -22,6 +22,9 @@
   "denylist_html",
   "denied_doctypes",
   "allow_config_writes",
+  "section_oauth",
+  "oauth_html",
+  "allow_client_registration",
   "section_log",
   "log_payloads",
   "log_retention_days"
@@ -49,6 +52,10 @@
   {"fieldname": "denied_doctypes", "fieldtype": "Table", "label": "Blocked DocTypes (backstop)", "options": "Synapse Denied DocType"},
   {"fieldname": "allow_config_writes", "fieldtype": "Check", "label": "Allow System Manager Config Writes", "default": "0", "description": "Lets a caller who holds the System Manager role create and update the read-only backstop DocTypes (Workflow, Custom Field, Property Setter, Report, Role, User Permission, DocType and the like) through MCP, since they can already do so in the desk. Off by default. Delete and run_operation on these stay blocked. Token, credential and Synapse's own control-plane DocTypes stay blocked for everyone whatever this is set to."},
 
+  {"fieldname": "section_oauth", "fieldtype": "Section Break", "label": "OAuth (Frappe v15)"},
+  {"fieldname": "oauth_html", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">On Frappe v15, Synapse serves the OAuth discovery an MCP client needs (<code>/.well-known/oauth-authorization-server</code> and <code>/.well-known/oauth-protected-resource</code>), pointing at Frappe's own OAuth endpoints. On Frappe v16 this section is ignored: turn on the matching switches in <b>OAuth Settings</b> instead.</p>"},
+  {"fieldname": "allow_client_registration", "fieldtype": "Check", "label": "Allow Dynamic Client Registration", "default": "0", "description": "Lets an MCP client such as Claude register itself as an OAuth Client, so nobody has to create one by hand. Registering grants nothing by itself: a user still signs in and approves the client, and gets only their own permissions. Rate limited per IP. Frappe v15 only."},
+
   {"fieldname": "section_log", "fieldtype": "Section Break", "label": "Audit Log"},
   {"fieldname": "log_payloads", "fieldtype": "Check", "label": "Log Field Values", "default": "1", "description": "Store submitted values and before/after changes on each Synapse Log row. Password-like fields are always masked. Untick if the data itself must not be duplicated into the log."},
   {"fieldname": "log_retention_days", "fieldtype": "Int", "label": "Retention (Days)", "default": "90", "description": "A daily job drops Synapse Log rows older than this."}
@@ -56,7 +63,7 @@
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-25 00:00:00.000000",
+ "modified": "2026-11-05 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Synapse",
  "name": "Synapse Settings",
